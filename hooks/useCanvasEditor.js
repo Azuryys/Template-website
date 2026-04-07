@@ -1,35 +1,35 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Canvas } from 'fabric';
 
 export default function useCanvasEditor(canvasId, template, onSelectionChange) {
-  const canvasRef = useRef(null);
+  const [canvas, setCanvas] = useState(null);
 
   useEffect(() => {
     if (!template) return;
 
     // Initialize Fabric.js canvas
-    const canvas = new Canvas(canvasId, {
+    const fabricCanvas = new Canvas(canvasId, {
       width: template.width,
       height: template.height,
       backgroundColor: '#ffffff'
     });
 
-    canvasRef.current = canvas;
+    setCanvas(fabricCanvas);
 
     // Selection event handlers
-    canvas.on('selection:created', (e) => {
+    fabricCanvas.on('selection:created', (e) => {
       if (onSelectionChange) {
         onSelectionChange(e.selected[0]);
       }
     });
 
-    canvas.on('selection:updated', (e) => {
+    fabricCanvas.on('selection:updated', (e) => {
       if (onSelectionChange) {
         onSelectionChange(e.selected[0]);
       }
     });
 
-    canvas.on('selection:cleared', () => {
+    fabricCanvas.on('selection:cleared', () => {
       if (onSelectionChange) {
         onSelectionChange(null);
       }
@@ -38,11 +38,11 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange) {
     // Delete key handler
     const handleKeyDown = (e) => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const activeObject = canvas.getActiveObject();
+        const activeObject = fabricCanvas.getActiveObject();
         if (activeObject) {
-          canvas.remove(activeObject);
-          canvas.discardActiveObject();
-          canvas.renderAll();
+          fabricCanvas.remove(activeObject);
+          fabricCanvas.discardActiveObject();
+          fabricCanvas.renderAll();
         }
       }
     };
@@ -52,9 +52,10 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange) {
     // Cleanup
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      canvas.dispose();
+      fabricCanvas.dispose();
+      setCanvas(null);
     };
   }, [canvasId, template, onSelectionChange]);
 
-  return canvasRef.current;
+  return canvas;
 }

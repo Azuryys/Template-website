@@ -3,7 +3,7 @@
 import { getTemplate } from '@/lib/templates';
 import CanvasEditor from '@/components/CanvasEditor';
 import Sidebar from '@/components/Sidebar';
-import { useState, use } from 'react';
+import { useState, use, useCallback } from 'react';
 
 export default function EditorPage({ params }) {
   const { templateId } = use(params);
@@ -11,18 +11,19 @@ export default function EditorPage({ params }) {
   const [canvas, setCanvas] = useState(null);
   const [selectedObject, setSelectedObject] = useState(null);
 
-  const handleCanvasReady = (canvasInstance) => {
+  const handleCanvasReady = useCallback((canvasInstance) => {
     setCanvas(canvasInstance);
-  };
+  }, []);
 
-  const handleSelectionChange = (obj) => {
+  const handleSelectionChange = useCallback((obj) => {
     setSelectedObject(obj);
-  };
+  }, []);
 
   const handleClearCanvas = () => {
     if (canvas) {
       canvas.clear();
-      canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+      canvas.backgroundColor = '#ffffff';
+      canvas.renderAll();
       setSelectedObject(null);
     }
   };
