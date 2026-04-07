@@ -2,12 +2,23 @@
 
 import { useState } from 'react';
 import { Textbox, FabricImage } from 'fabric';
+import styles from './Sidebar.module.css';
 
 export default function Sidebar({ canvas, selectedObject, template }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [textColor, setTextColor] = useState('#000000');
   const [fontSize, setFontSize] = useState(24);
   const [fontWeight, setFontWeight] = useState('400');
+  const [fontFamily, setFontFamily] = useState('BauerMediaSans');
+  const [selectedFontKey, setSelectedFontKey] = useState('BauerMediaSans-Regular');
+  const [showFontDialog, setShowFontDialog] = useState(false);
+  const [tempSelectedFont, setTempSelectedFont] = useState('BauerMediaSans-Regular');
+
+  const fontsOptions = [
+    { key: 'BauerMediaSans-Light', label: 'BauerMediaSans Light', family: 'BauerMediaSans', weight: '300' },
+    { key: 'BauerMediaSans-Regular', label: 'BauerMediaSans Regular', family: 'BauerMediaSans', weight: '400' },
+    { key: 'BauerMediaSans-Bold', label: 'BauerMediaSans Bold', family: 'BauerMediaSans', weight: '700' },
+  ];
 
   // Add text to canvas
   const handleAddText = () => {
@@ -19,7 +30,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
       width: 200,
       fontSize: fontSize,
       fill: textColor,
-      fontFamily: 'BauerMediaSans',
+      fontFamily: fontFamily,
       fontWeight: fontWeight,
       editable: true
     });
@@ -27,6 +38,35 @@ export default function Sidebar({ canvas, selectedObject, template }) {
     canvas.add(text);
     canvas.setActiveObject(text);
     canvas.renderAll();
+  };
+
+  const handleConfirmFont = () => {
+    const opt = fontsOptions.find((o) => o.key === tempSelectedFont);
+    if (!opt) return;
+    
+    setSelectedFontKey(tempSelectedFont);
+    setFontFamily(opt.family);
+    setFontWeight(opt.weight);
+
+    // Add a new textbox with the selected font
+    if (canvas) {
+      const text = new Textbox('Click to edit', {
+        left: 100,
+        top: 100,
+        width: 200,
+        fontSize: fontSize,
+        fill: textColor,
+        fontFamily: opt.family,
+        fontWeight: opt.weight,
+        editable: true
+      });
+
+      canvas.add(text);
+      canvas.setActiveObject(text);
+      canvas.renderAll();
+    }
+
+    setShowFontDialog(false);
   };
 
   // Update selected text properties
@@ -39,9 +79,11 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   };
 
   const handleFontSizeChange = (size) => {
-    setFontSize(parseInt(size));
+    const parsed = parseInt(size, 10);
+    if (isNaN(parsed)) return;
+    setFontSize(parsed);
     if (selectedObject && selectedObject.type === 'textbox') {
-      selectedObject.set('fontSize', parseInt(size));
+      selectedObject.set('fontSize', parsed);
       canvas.renderAll();
     }
   };
@@ -165,78 +207,127 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   };
 
   return (
-    <div className="w-80 bg-white border-l border-gray-200 flex flex-col shadow-lg overflow-y-auto">
-      {/* Header */}
-      <div className="p-6 border-b border-gray-200">
-        <h2 className="text-2xl font-bold text-gray-900">Definições</h2>
-      </div>
+    <>
+      {/* Font Selection Dialog */}
+      {showFontDialog && (
+        <div className={styles.modalOverlay} onClick={() => setShowFontDialog(false)}>
+          <div className={styles.dialogBox} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Which font?</h3>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select a font:</label>
+              <select
+                value={tempSelectedFont}
+                onChange={(e) => setTempSelectedFont(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {fontsOptions.map((opt) => (
+                  <option key={opt.key} value={opt.key}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
 
-      {/* Fonts Section */}
-      <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Fonts</h3>
-        
-        <button
-          onClick={handleAddText}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg mb-4 font-semibold transition-colors"
-        >
-          + Add Text
-        </button>
-
-        <div className="space-y-4">
-          {/* Font Weight */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Font Weight
-            </label>
-            <select
-              value={fontWeight}
-              onChange={(e) => handleFontWeightChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="300">Light (300)</option>
-              <option value="400">Regular (400)</option>
-              <option value="700">Bold (700)</option>
-            </select>
-          </div>
-
-          {/* Font Size */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Font Size: {fontSize}px
-            </label>
-            <input
-              type="range"
-              min="12"
-              max="120"
-              value={fontSize}
-              onChange={(e) => handleFontSizeChange(e.target.value)}
-              className="w-full"
-            />
-          </div>
-
-          {/* Text Color */}
-          <div>
-            {/* (Text color swatches moved below into their own section) */}
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-              Text Color
-            </label>
-            <div className="flex items-center gap-2 mb-3">
-              <input
-                type="color"
-                value={textColor}
-                onChange={(e) => handleTextColorChange(e.target.value)}
-                className="w-12 h-10 rounded cursor-pointer"
-              />
-              <input
-                type="text"
-                value={textColor}
-                onChange={(e) => handleTextColorChange(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
-              />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowFontDialog(false)}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmFont}
+                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold transition-colors"
+              >
+                Confirm
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      <div className="w-80 bg-white border-l border-gray-200 flex flex-col shadow-lg overflow-y-auto">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-900">Definições</h2>
+        </div>
+
+        {/* Fonts Section */}
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Fonts</h3>
+          
+          <div className="mb-4">
+            <button
+              onClick={() => setShowFontDialog(true)}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg mb-2 font-semibold transition-colors"
+            >
+              + Add Text
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Font Weight */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Font Weight
+              </label>
+              <select
+                value={fontWeight}
+                onChange={(e) => handleFontWeightChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="300">Light (300)</option>
+                <option value="400">Regular (400)</option>
+                <option value="700">Bold (700)</option>
+              </select>
+            </div>
+
+            {/* Font Size */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Font Size
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="12"
+                  max="120"
+                  value={fontSize}
+                  onChange={(e) => handleFontSizeChange(e.target.value)}
+                  className="flex-1"
+                />
+                <input
+                  type="number"
+                  min="12"
+                  max="120"
+                  value={fontSize}
+                  onChange={(e) => handleFontSizeChange(e.target.value)}
+                  className="w-20 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Text Color */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Text Color
+              </label>
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="color"
+                  value={textColor}
+                  onChange={(e) => handleTextColorChange(e.target.value)}
+                  className="w-12 h-10 rounded cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={textColor}
+                  onChange={(e) => handleTextColorChange(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
 
       {/* Colors Section (Background) */}
       <div className="p-6 border-b border-gray-200">
@@ -488,37 +579,38 @@ export default function Sidebar({ canvas, selectedObject, template }) {
         </div>
       </div>
 
-      {/* Layer Controls */}
-      {selectedObject && (
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Layers</h3>
-          
-          <div className="flex gap-2">
-            <button
-              onClick={handleBringForward}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              ↑ Forward
-            </button>
-            <button
-              onClick={handleSendBackward}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              ↓ Backward
-            </button>
+        {/* Layer Controls */}
+        {selectedObject && (
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Layers</h3>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={handleBringForward}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                ↑ Forward
+              </button>
+              <button
+                onClick={handleSendBackward}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                ↓ Backward
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Download Button */}
-      <div className="p-6 mt-auto">
-        <button
-          onClick={handleDownload}
-          className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
-        >
-          Download PNG
-        </button>
+        {/* Download Button */}
+        <div className="p-6 mt-auto">
+          <button
+            onClick={handleDownload}
+            className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
+          >
+            Download PNG
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
