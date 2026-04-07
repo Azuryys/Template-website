@@ -3,10 +3,11 @@
 import { getTemplate } from '@/lib/templates';
 import CanvasEditor from '@/components/CanvasEditor';
 import Sidebar from '@/components/Sidebar';
-import { useState } from 'react';
+import { useState, use } from 'react';
 
 export default function EditorPage({ params }) {
-  const template = getTemplate(params.templateId);
+  const { templateId } = use(params);
+  const template = getTemplate(templateId);
   const [canvas, setCanvas] = useState(null);
   const [selectedObject, setSelectedObject] = useState(null);
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { fabric } from 'fabric';
+import { Canvas } from 'fabric';
 
 export default function useCanvasEditor(canvasId, template, onSelectionChange) {
   const canvasRef = useRef(null);
@@ -8,7 +8,7 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange) {
     if (!template) return;
 
     // Initialize Fabric.js canvas
-    const canvas = new fabric.Canvas(canvasId, {
+    const canvas = new Canvas(canvasId, {
       width: template.width,
       height: template.height,
       backgroundColor: '#ffffff'

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { fabric } from 'fabric';
+import { Textbox, FabricImage } from 'fabric';
 
 export default function Sidebar({ canvas, selectedObject, template }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
@@ -13,7 +13,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   const handleAddText = () => {
     if (!canvas) return;
 
-    const text = new fabric.Textbox('Click to edit', {
+    const text = new Textbox('Click to edit', {
       left: 100,
       top: 100,
       width: 200,
@@ -58,7 +58,8 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   const handleBackgroundColorChange = (color) => {
     setBackgroundColor(color);
     if (canvas) {
-      canvas.setBackgroundColor(color, canvas.renderAll.bind(canvas));
+      canvas.backgroundColor = color;
+      canvas.renderAll();
     }
   };
 
@@ -76,7 +77,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      fabric.Image.fromURL(event.target.result, (img) => {
+      FabricImage.fromURL(event.target.result).then((img) => {
         // Scale image to fit canvas
         const scaleX = canvas.width / img.width;
         const scaleY = canvas.height / img.height;
@@ -89,7 +90,8 @@ export default function Sidebar({ canvas, selectedObject, template }) {
           originY: 'top'
         });
 
-        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+        canvas.backgroundImage = img;
+        canvas.renderAll();
       });
     };
     reader.readAsDataURL(file);
@@ -109,7 +111,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      fabric.Image.fromURL(event.target.result, (img) => {
+      FabricImage.fromURL(event.target.result).then((img) => {
         // Scale down if image is too large
         const maxWidth = canvas.width * 0.5;
         const maxHeight = canvas.height * 0.5;
