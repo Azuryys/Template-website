@@ -108,7 +108,14 @@ export default function LoginPage() {
                 />
                 <span className="ml-2 text-gray-600">Lembrar-me</span>
               </label>
-              <Link href="/PasswordRecover" className="text-blue-600 hover:text-blue-700 font-medium">
+              
+              {/* ============================================ */}
+              {/* LINK PARA RECUPERAÇÃO DE SENHA */}
+              {/* ============================================ */}
+              <Link 
+                href="/PasswordRecover" 
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
                 Esqueceu a senha?
               </Link>
             </div>
@@ -124,7 +131,7 @@ export default function LoginPage() {
           </form>
 
           {/* Divider */}
-        {/*   <div className="mt-6 relative">
+          {/* <div className="mt-6 relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300"></div>
             </div>
