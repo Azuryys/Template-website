@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticateUser } from '@/lib/auth';
 
-export default function LoginPage() {
+export default function PasswordRecover() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -109,7 +109,7 @@ export default function LoginPage() {
                 <span className="ml-2 text-gray-600">Lembrar-me</span>
               </label>
               <Link href="/PasswordRecover" className="text-blue-600 hover:text-blue-700 font-medium">
-                Esqueceu a senha?
+                Esqueceu 
               </Link>
             </div>
 
