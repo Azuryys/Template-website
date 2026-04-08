@@ -35,7 +35,7 @@ export default function EditorPage({ params }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <a
-              href="/"
+              href="/dashboard"
               className="text-gray-600 hover:text-gray-900 transition-colors"
             >
               ← Back

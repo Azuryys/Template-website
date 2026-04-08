@@ -8,9 +8,8 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [textColor, setTextColor] = useState('#000000');
   const [fontSize, setFontSize] = useState(24);
+  const [fontSizeInputValue, setFontSizeInputValue] = useState('24');
   const [fontWeight, setFontWeight] = useState('400');
-  const [fontFamily, setFontFamily] = useState('BauerMediaSans');
-  const [selectedFontKey, setSelectedFontKey] = useState('BauerMediaSans-Regular');
   const [showFontDialog, setShowFontDialog] = useState(false);
   const [tempSelectedFont, setTempSelectedFont] = useState('BauerMediaSans-Regular');
 
@@ -20,50 +19,34 @@ export default function Sidebar({ canvas, selectedObject, template }) {
     { key: 'BauerMediaSans-Bold', label: 'BauerMediaSans Bold', family: 'BauerMediaSans', weight: '700' },
   ];
 
-  // Add text to canvas
-  const handleAddText = () => {
-    if (!canvas) return;
-
-    const text = new Textbox('Click to edit', {
-      left: 100,
-      top: 100,
-      width: 200,
-      fontSize: fontSize,
-      fill: textColor,
-      fontFamily: fontFamily,
-      fontWeight: fontWeight,
-      editable: true
-    });
-
-    canvas.add(text);
-    canvas.setActiveObject(text);
-    canvas.renderAll();
-  };
-
   const handleConfirmFont = () => {
     const opt = fontsOptions.find((o) => o.key === tempSelectedFont);
     if (!opt) return;
-    
-    setSelectedFontKey(tempSelectedFont);
-    setFontFamily(opt.family);
+
     setFontWeight(opt.weight);
 
-    // Add a new textbox with the selected font
     if (canvas) {
-      const text = new Textbox('Click to edit', {
-        left: 100,
-        top: 100,
-        width: 200,
-        fontSize: fontSize,
-        fill: textColor,
-        fontFamily: opt.family,
-        fontWeight: opt.weight,
-        editable: true
-      });
+      if (selectedObject && selectedObject.type === 'textbox') {
+        // Update the existing selected textbox's font
+        selectedObject.set({ fontFamily: opt.family, fontWeight: opt.weight });
+        canvas.renderAll();
+      } else {
+        // No textbox selected — add a new one
+        const text = new Textbox('Click to edit', {
+          left: 100,
+          top: 100,
+          width: 200,
+          fontSize: fontSize,
+          fill: textColor,
+          fontFamily: opt.family,
+          fontWeight: opt.weight,
+          editable: true
+        });
 
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      canvas.renderAll();
+        canvas.add(text);
+        canvas.setActiveObject(text);
+        canvas.renderAll();
+      }
     }
 
     setShowFontDialog(false);
@@ -78,13 +61,29 @@ export default function Sidebar({ canvas, selectedObject, template }) {
     }
   };
 
-  const handleFontSizeChange = (size) => {
-    const parsed = parseInt(size, 10);
+  const applyFontSize = (value) => {
+    const parsed = parseInt(value, 10);
     if (isNaN(parsed)) return;
-    setFontSize(parsed);
+    const clamped = Math.min(120, Math.max(12, parsed));
+    setFontSize(clamped);
+    setFontSizeInputValue(String(clamped));
     if (selectedObject && selectedObject.type === 'textbox') {
-      selectedObject.set('fontSize', parsed);
+      selectedObject.set('fontSize', clamped);
       canvas.renderAll();
+    }
+  };
+
+  const handleFontSizeSliderChange = (size) => {
+    applyFontSize(size);
+  };
+
+  const handleFontSizeInputChange = (e) => {
+    setFontSizeInputValue(e.target.value);
+  };
+
+  const handleFontSizeKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      applyFontSize(fontSizeInputValue);
     }
   };
 
@@ -273,7 +272,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
               <select
                 value={fontWeight}
                 onChange={(e) => handleFontWeightChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
               >
                 <option value="300">Light (300)</option>
                 <option value="400">Regular (400)</option>
@@ -292,25 +291,120 @@ export default function Sidebar({ canvas, selectedObject, template }) {
                   min="12"
                   max="120"
                   value={fontSize}
-                  onChange={(e) => handleFontSizeChange(e.target.value)}
+                  onChange={(e) => handleFontSizeSliderChange(e.target.value)}
                   className="flex-1"
                 />
                 <input
                   type="number"
-                  min="12"
-                  max="120"
-                  value={fontSize}
-                  onChange={(e) => handleFontSizeChange(e.target.value)}
-                  className="w-20 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                  value={fontSizeInputValue}
+                  onChange={handleFontSizeInputChange}
+                  onKeyDown={handleFontSizeKeyDown}
+                  className="w-20 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm text-gray-900"
                 />
               </div>
             </div>
 
             {/* Text Color */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Text Color
-              </label>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Text Colors</h3>
+
+              <div className="space-y-3 mb-3">
+                {/* Black / White */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Black & White</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { name: 'Black', hex: '#000000' },
+                      { name: 'White', hex: '#FFFFFF' },
+                    ].map(({ name, hex }) => (
+                      <button
+                        key={hex}
+                        title={`${name} ${hex}`}
+                        onClick={() => handleTextColorChange(hex)}
+                        className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Brand + Primary + Light + Dark (re-used palette) */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Brand</p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[{ name: 'Brand Color', hex: '#4700a3' }].map(({ name, hex }) => (
+                      <button
+                        key={hex}
+                        title={`${name} ${hex}`}
+                        onClick={() => handleTextColorChange(hex)}
+                        className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Primary</p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[
+                      { name: 'Mint',     hex: '#1fd1bd' },
+                      { name: 'Lavender', hex: '#a096ff' },
+                      { name: 'Peach',    hex: '#ff7d6a' },
+                      { name: 'Lemon',    hex: '#fff050' },
+                      { name: 'Aqua',     hex: '#5af0ff' },
+                      { name: 'Taffy',    hex: '#ff78c8' },
+                    ].map(({ name, hex }) => (
+                      <button
+                        key={hex}
+                        title={`${name} ${hex}`}
+                        onClick={() => handleTextColorChange(hex)}
+                        className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Light Shades</p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {[
+                      { name: 'Light Mint',     hex: '#befaeb' },
+                      { name: 'Light Lavender', hex: '#e1dcff' },
+                      { name: 'Light Peach',    hex: '#ffd2d2' },
+                      { name: 'Light Lemon',    hex: '#ffffc8' },
+                      { name: 'Light Aqua',     hex: '#c8faff' },
+                      { name: 'Light Taffy',    hex: '#ffd2eb' },
+                    ].map(({ name, hex }) => (
+                      <button
+                        key={hex}
+                        title={`${name} ${hex}`}
+                        onClick={() => handleTextColorChange(hex)}
+                        className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Dark Shades</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { name: 'Dark Mint',     hex: '#009392' },
+                      { name: 'Dark Lavender', hex: '#7d78e8' },
+                      { name: 'Dark Peach',    hex: '#d05c5d' },
+                      { name: 'Dark Lemon',    hex: '#f0a800' },
+                      { name: 'Dark Aqua',     hex: '#349cdc' },
+                      { name: 'Dark Taffy',    hex: '#d54380' },
+                    ].map(({ name, hex }) => (
+                      <button
+                        key={hex}
+                        title={`${name} ${hex}`}
+                        onClick={() => handleTextColorChange(hex)}
+                        className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center gap-2 mb-3">
                 <input
                   type="color"
@@ -322,16 +416,16 @@ export default function Sidebar({ canvas, selectedObject, template }) {
                   type="text"
                   value={textColor}
                   onChange={(e) => handleTextColorChange(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm text-gray-900"
                 />
               </div>
-            </div>
+            </div>  
           </div>
         </div>
 
       {/* Colors Section (Background) */}
       <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Colors</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4"> Background Colors</h3>
 
         {/* Default Colors */}
         <div className="mb-5 space-y-3">
@@ -438,7 +532,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
                 type="text"
                 value={backgroundColor}
                 onChange={(e) => handleBackgroundColorChange(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm text-gray-900"
               />
             </div>
           </div>
@@ -452,7 +546,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
               type="file"
               accept="image/*"
               onChange={handleBackgroundImageUpload}
-              className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
             <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
           </div>
@@ -471,111 +565,9 @@ export default function Sidebar({ canvas, selectedObject, template }) {
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
-            className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+            className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
           />
           <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
-        </div>
-      </div>
-
-      {/* Text Colors (moved here) */}
-      <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Text colors</h3>
-
-        <div className="space-y-3">
-          {/* Black / White */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Text colors</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { name: 'Black', hex: '#000000' },
-                { name: 'White', hex: '#FFFFFF' },
-              ].map(({ name, hex }) => (
-                <button
-                  key={hex}
-                  title={`${name} ${hex}`}
-                  onClick={() => handleTextColorChange(hex)}
-                  className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Brand + Primary + Light + Dark (re-used palette) */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Brand</p>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {[{ name: 'Brand Color', hex: '#4700a3' }].map(({ name, hex }) => (
-                <button
-                  key={hex}
-                  title={`${name} ${hex}`}
-                  onClick={() => handleTextColorChange(hex)}
-                  className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Primary</p>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {[
-                { name: 'Mint',     hex: '#1fd1bd' },
-                { name: 'Lavender', hex: '#a096ff' },
-                { name: 'Peach',    hex: '#ff7d6a' },
-                { name: 'Lemon',    hex: '#fff050' },
-                { name: 'Aqua',     hex: '#5af0ff' },
-                { name: 'Taffy',    hex: '#ff78c8' },
-              ].map(({ name, hex }) => (
-                <button
-                  key={hex}
-                  title={`${name} ${hex}`}
-                  onClick={() => handleTextColorChange(hex)}
-                  className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Light Shades</p>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {[
-                { name: 'Light Mint',     hex: '#befaeb' },
-                { name: 'Light Lavender', hex: '#e1dcff' },
-                { name: 'Light Peach',    hex: '#ffd2d2' },
-                { name: 'Light Lemon',    hex: '#ffffc8' },
-                { name: 'Light Aqua',     hex: '#c8faff' },
-                { name: 'Light Taffy',    hex: '#ffd2eb' },
-              ].map(({ name, hex }) => (
-                <button
-                  key={hex}
-                  title={`${name} ${hex}`}
-                  onClick={() => handleTextColorChange(hex)}
-                  className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Dark Shades</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { name: 'Dark Mint',     hex: '#009392' },
-                { name: 'Dark Lavender', hex: '#7d78e8' },
-                { name: 'Dark Peach',    hex: '#d05c5d' },
-                { name: 'Dark Lemon',    hex: '#f0a800' },
-                { name: 'Dark Aqua',     hex: '#349cdc' },
-                { name: 'Dark Taffy',    hex: '#d54380' },
-              ].map(({ name, hex }) => (
-                <button
-                  key={hex}
-                  title={`${name} ${hex}`}
-                  onClick={() => handleTextColorChange(hex)}
-                  className="w-8 h-8 rounded-full border-2 border-black hover:scale-110 transition-transform"
-                  style={{ backgroundColor: hex }}
-                />
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 

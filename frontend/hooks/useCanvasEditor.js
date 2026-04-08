@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Canvas } from 'fabric';
 
 export default function useCanvasEditor(canvasId, template, onSelectionChange) {
   const [canvas, setCanvas] = useState(null);
+  const onSelectionChangeRef = useRef(onSelectionChange);
+
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
 
   useEffect(() => {
     if (!template) return;
@@ -18,25 +23,23 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange) {
 
     // Selection event handlers
     fabricCanvas.on('selection:created', (e) => {
-      if (onSelectionChange) {
-        onSelectionChange(e.selected[0]);
-      }
+      onSelectionChangeRef.current?.(e.selected[0]);
     });
 
     fabricCanvas.on('selection:updated', (e) => {
-      if (onSelectionChange) {
-        onSelectionChange(e.selected[0]);
-      }
+      onSelectionChangeRef.current?.(e.selected[0]);
     });
 
     fabricCanvas.on('selection:cleared', () => {
-      if (onSelectionChange) {
-        onSelectionChange(null);
-      }
+      onSelectionChangeRef.current?.(null);
     });
 
-    // Delete key handler
+    // Delete key handler – ignore when focus is inside an input or textarea
     const handleKeyDown = (e) => {
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) {
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const activeObject = fabricCanvas.getActiveObject();
         if (activeObject) {
@@ -55,7 +58,7 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange) {
       fabricCanvas.dispose();
       setCanvas(null);
     };
-  }, [canvasId, template, onSelectionChange]);
+  }, [canvasId, template]);
 
   return canvas;
 }
