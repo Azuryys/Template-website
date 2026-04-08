@@ -178,14 +178,14 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   // Layer controls
   const handleBringForward = () => {
     if (selectedObject) {
-      canvas.bringForward(selectedObject);
+      canvas.bringObjectForward(selectedObject);
       canvas.renderAll();
     }
   };
 
   const handleSendBackward = () => {
     if (selectedObject) {
-      canvas.sendBackwards(selectedObject);
+      canvas.sendObjectBackwards(selectedObject);
       canvas.renderAll();
     }
   };
