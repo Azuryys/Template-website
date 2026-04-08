@@ -1,4 +1,11 @@
-// Template configurations for different banner sizes
+// Template configurations for different banner sizes.
+//
+// Each template has an optional `logo` placement config:
+//   widthRatio  — logo width as a fraction of canvas width  (e.g. 0.4 = 40%)
+//   leftRatio   — left edge as a fraction of canvas width
+//   topRatio    — top edge as a fraction of canvas height
+//
+// Adjust these three values per template to fine-tune logo placement.
 export const templates = {
   // --- Portrait / Tall Formats ---
   'half-page-ad': {
@@ -6,42 +13,48 @@ export const templates = {
     name: 'Half Page Ad',
     width: 300,
     height: 600,
-    description: 'Standard half-page ad unit'
+    description: 'Standard half-page ad unit',
+    logo: { widthRatio: 0.40, leftRatio: 0.24, topRatio: 0.08 }
   },
   'portrait-banner': {
     id: 'portrait-banner',
     name: 'Portrait Banner',
     width: 200,
     height: 700,
-    description: 'Tall portrait banner format'
+    description: 'Tall portrait banner format',
+    logo: { widthRatio: 0.40, leftRatio: 0.24, topRatio: 0.05 }
   },
   'wide-skyscraper': {
     id: 'wide-skyscraper',
     name: 'Wide Skyscraper',
     width: 160,
     height: 600,
-    description: 'Vertical sidebar banner'
+    description: 'Vertical sidebar banner',
+    logo: { widthRatio: 0.40, leftRatio: 0.24, topRatio: 0.04 }
   },
   'skyscraper': {
     id: 'skyscraper',
     name: 'Skyscraper',
     width: 120,
     height: 600,
-    description: 'Narrow vertical skyscraper'
+    description: 'Narrow vertical skyscraper',
+    logo: { widthRatio: 0.40, leftRatio: 0.5, topRatio: 0.04 }
   },
   'vertical-banner': {
     id: 'vertical-banner',
     name: 'Vertical Banner',
     width: 120,
     height: 240,
-    description: 'Small vertical banner'
+    description: 'Small vertical banner',
+    logo: { widthRatio: 0.40, leftRatio: 0.24, topRatio: 0.08 }
   },
   'mobile-fullscreen': {
     id: 'mobile-fullscreen',
     name: 'Mobile Fullscreen',
     width: 1080,
     height: 1920,
-    description: 'Mobile full-screen / story format'
+    description: 'Mobile full-screen / story format',
+    logo: { widthRatio: 0.2, leftRatio: 0.12, topRatio: 0.04 }
   },
   // --- Landscape / Wide Formats ---
   'pop-under': {
@@ -49,14 +62,16 @@ export const templates = {
     name: 'Pop-Under',
     width: 720,
     height: 300,
-    description: 'Wide landscape banner'
+    description: 'Wide landscape banner',
+    logo: { widthRatio: 0.20, leftRatio: 0.12, topRatio: 0.18 }
   },
   '3-1-rectangle': {
     id: '3-1-rectangle',
     name: '3:1 Rectangle',
     width: 300,
     height: 100,
-    description: 'Wide 3:1 ratio rectangle'
+    description: 'Wide 3:1 ratio rectangle',
+    logo: { widthRatio: 0.20, leftRatio: 0.12, topRatio: 0.20 }
   },
   // --- Rectangle / Square Formats ---
   'medium-rectangle': {
@@ -64,35 +79,40 @@ export const templates = {
     name: 'Medium Rectangle',
     width: 300,
     height: 250,
-    description: 'Common sidebar ad size'
+    description: 'Common sidebar ad size',
+    logo: { widthRatio: 0.20, leftRatio: 0.12, topRatio: 0.1 }
   },
   'large-rectangle': {
     id: 'large-rectangle',
     name: 'Large Rectangle',
     width: 336,
     height: 280,
-    description: 'Larger inline content ad'
+    description: 'Larger inline content ad',
+    logo: { widthRatio: 0.20, leftRatio: 0.5, topRatio: 0.1 }
   },
   'square-pop-up': {
     id: 'square-pop-up',
     name: 'Square Pop-Up',
     width: 250,
     height: 250,
-    description: 'Square pop-up banner'
+    description: 'Square pop-up banner',
+    logo: { widthRatio: 0.20, leftRatio: 0.5, topRatio: 0.08 }
   },
   'small-rectangle': {
     id: 'small-rectangle',
     name: 'Small Rectangle',
     width: 180,
     height: 150,
-    description: 'Compact rectangle ad'
+    description: 'Compact rectangle ad',
+    logo: { widthRatio: 0.20, leftRatio: 0.85, topRatio: 0.1 }
   },
   'wide-skyscraper-alt': {
     id: 'wide-skyscraper-alt',
     name: 'Wide Skyscraper Alt',
     width: 240,
     height: 400,
-    description: 'Alternative wide skyscraper'
+    description: 'Alternative wide skyscraper',
+    logo: { widthRatio: 0.40, leftRatio: 0.08, topRatio: 0.05 }
   },
   // --- Print Format ---
   'din-a4': {
@@ -100,7 +120,8 @@ export const templates = {
     name: 'DIN A4',
     width: 595,
     height: 842,
-    description: 'Standard A4 print format (72 DPI)'
+    description: 'Standard A4 print format (72 DPI)',
+    logo: { widthRatio: 0.20, leftRatio: 0.06, topRatio: 0.04 }
   }
 };
 
