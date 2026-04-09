@@ -52,7 +52,7 @@ export default function PasswordVerifyPage() {
     setStatus('loading');
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/verify-code', {
+      const response = await fetch('http://localhost:3001/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),

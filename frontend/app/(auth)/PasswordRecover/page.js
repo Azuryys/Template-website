@@ -39,7 +39,7 @@ export default function PasswordRecoverPage() {
     setStatus('loading');
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/recover', {
+      const response = await fetch('http://localhost:3001/api/auth/recover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
