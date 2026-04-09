@@ -122,6 +122,15 @@ export const templates = {
     height: 842,
     description: 'Standard A4 print format (72 DPI)',
     logo: { widthRatio: 0.20, leftRatio: 0.06, topRatio: 0.04 }
+  },
+  // --- Email Header ---
+  'email-header': {
+    id: 'email-header',
+    name: 'Email Header',
+    width: 1200,
+    height: 630,
+    description: 'Email header with image, text, and block',
+    logo: { widthRatio: 0.15, leftRatio: 0.80, topRatio: 0.05 }
   }
 };
 
