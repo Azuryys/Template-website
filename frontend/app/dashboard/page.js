@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getAllTemplates } from '@/lib/templates';
+import Header from '@/components/Header';
 
 const PRESETS = [
   { label: '1920 × 1080 (Full HD)', width: 1920, height: 1080 },
@@ -56,32 +57,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Bem-vindo, {user.name}!
-            </h1>
-            <p className="text-gray-600 text-sm mt-1">{user.email}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {isAdmin && (
-              <Link
-                href="/register"
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition"
-              >
-                + Criar Usuário
-              </Link>
-            )}
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header isAdmin={isAdmin} handleLogout={handleLogout} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
