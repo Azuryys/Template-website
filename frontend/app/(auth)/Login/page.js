@@ -5,6 +5,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticateUser } from '@/lib/auth';
 
+/**
+ * PÁGINA DE LOGIN
+ * ===============
+ * Faz autenticação contra um mock database (lib/auth.js)
+ * Credenciais de teste:
+ *   - Email: admin@gmail.com
+ *   - Senha: admin123
+ */
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,24 +26,29 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // Chama a função de autenticação do mock database
       const user = authenticateUser(email, password);
       
       if (user) {
-        // Armazenar user no localStorage
+        // ✅ Login bem-sucedido - armazenar utilizador no localStorage
         localStorage.setItem('user', JSON.stringify(user));
-        // Store password temporarily for admin verification (this is for demo)
+        // Armazenar senha temporariamente (apenas para demo)
         localStorage.setItem('userPassword', password);
-        // Redirecionar para dashboard/home
+        // Redirecionar para dashboard
         setTimeout(() => {
           router.push('/dashboard');
         }, 500);
       } else {
+        // ❌ Credenciais inválidas
         setError('Email ou senha inválidos');
         setLoading(false);
+        console.warn('Login falhou:', { email, password });
       }
     } catch (err) {
+      // ❌ Erro inesperado durante o login
       setError('Falha ao fazer login. Tente novamente.');
       setLoading(false);
+      console.error('Erro ao fazer login:', err);
     }
   };
 
@@ -142,12 +155,12 @@ export default function LoginPage() {
 
           {/* Register Link */}
           <div className="mt-6 text-center">
-             {/* <p className="text-gray-600 text-sm">
-              Não tem uma conta?{' '}
-              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
-                Criar conta
+             <p className="text-gray-600 text-sm">
+              Ainda não tem conta?{' '}
+              <Link href="/SelfRegister" className="text-blue-600 hover:text-blue-700 font-semibold">
+                Registar-se aqui
               </Link>
-            </p>*/}
+            </p>
           </div>
         </div>
 
