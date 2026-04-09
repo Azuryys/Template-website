@@ -4,8 +4,6 @@ import { getTemplate } from '@/lib/templates';
 import { getTemplateInitializer } from '@/lib/templateInitializers';
 import CanvasEditor from '@/components/CanvasEditor';
 import Sidebar from '@/components/Sidebar';
-import ImageUploadModal from '@/components/ImageUploadModal';
-import ImageCropperModal from '@/components/ImageCropperModal';
 import { useState, use, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FabricImage } from 'fabric';
@@ -47,10 +45,8 @@ export default function EditorPage({ params }) {
   const [savedTemplates, setSavedTemplates] = useState([]);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [selectedLoadTemplate, setSelectedLoadTemplate] = useState(null);
-  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
-  const [showImageCropperModal, setShowImageCropperModal] = useState(false);
-  const [selectedImageData, setSelectedImageData] = useState(null);
-  const [placeholderDimensions, setPlaceholderDimensions] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const pendingPlaceholderRef = useRef(null);
 
   // Load saved templates from localStorage
@@ -191,37 +187,34 @@ export default function EditorPage({ params }) {
       canvas.renderAll();
     }
     pendingPlaceholderRef.current = placeholder;
-    setPlaceholderDimensions({
-      width: placeholder.width,
-      height: placeholder.height
-    });
-    setShowImageUploadModal(true);
+    setShowImageModal(true);
   };
 
-  const handleImageSelected = (imageData) => {
-    // Store the image data and show the cropper modal
-    setSelectedImageData(imageData);
-    setShowImageUploadModal(false);
-    setShowImageCropperModal(true);
+  const handleImageFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const maxSize = 200 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('File size exceeds 200MB limit');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      insertImageIntoPlaceholder(event.target.result);
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleImageCropConfirm = (croppedImageData) => {
-    // Insert the cropped image into the canvas
-    insertImageIntoPlaceholder(croppedImageData.src);
-    setShowImageCropperModal(false);
-    setSelectedImageData(null);
-    setPlaceholderDimensions(null);
-  };
-
-  const handleImageUploadClose = () => {
-    setShowImageUploadModal(false);
-    pendingPlaceholderRef.current = null;
-    setPlaceholderDimensions(null);
-  };
-
-  const handleImageCropperClose = () => {
-    setShowImageCropperModal(false);
-    setSelectedImageData(null);
+  const handleImageUrlSubmit = () => {
+    const url = imageUrlInput.trim();
+    if (!url) {
+      alert('Please enter a valid image URL');
+      return;
+    }
+    insertImageIntoPlaceholder(url);
+    setImageUrlInput('');
   };
 
   const insertImageIntoPlaceholder = (imageSource) => {
@@ -234,25 +227,30 @@ export default function EditorPage({ params }) {
     const placeholderTop = placeholder.top;
 
     FabricImage.fromURL(imageSource, { crossOrigin: 'anonymous' }).then((img) => {
-      // Image is already sized by the cropper, so just center it
+      const targetWidth = placeholderWidth;
+      const targetHeight = placeholderHeight;
+
+      const scaleX = targetWidth / img.width;
+      const scaleY = targetHeight / img.height;
+      const scale = Math.min(scaleX, scaleY);
+
+      img.scale(scale);
       img.set({
-        left: placeholderLeft + placeholderWidth / 2,
-        top: placeholderTop + placeholderHeight / 2,
+        left: placeholderLeft + targetWidth / 2,
+        top: placeholderTop + targetHeight / 2,
         originX: 'center',
         originY: 'center',
         name: 'headerImage',
-        selectable: true,
-        hasControls: true,
       });
 
       canvas.remove(placeholder);
       canvas.add(img);
-      canvas.setActiveObject(img);
       canvas.renderAll();
       pendingPlaceholderRef.current = null;
+      setShowImageModal(false);
     }).catch((error) => {
       console.error('Error loading image:', error);
-      alert('Failed to load image. Please try again.');
+      alert('Failed to load image. Please check the URL or try a different image.');
     });
   };
 
@@ -468,22 +466,62 @@ export default function EditorPage({ params }) {
         </div>
       )}
 
-      {/* Image Upload Modal */}
-      <ImageUploadModal
-        isOpen={showImageUploadModal}
-        onClose={handleImageUploadClose}
-        onImageSelect={handleImageSelected}
-        placeholderDimensions={placeholderDimensions}
-      />
+      {/* Image Selection Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-[480px]">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Add Header Image</h2>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Upload from computer
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileSelect}
+                className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <p className="text-xs text-gray-500 mt-1">Max 200MB • JPG, PNG, GIF, WebP</p>
+            </div>
 
-      {/* Image Cropper Modal */}
-      <ImageCropperModal
-        isOpen={showImageCropperModal}
-        onClose={handleImageCropperClose}
-        onConfirm={handleImageCropConfirm}
-        imageSrc={selectedImageData?.src}
-        placeholderDimensions={placeholderDimensions}
-      />
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Or enter an image URL
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={imageUrlInput}
+                  onChange={(e) => setImageUrlInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleImageUrlSubmit()}
+                  placeholder="https://example.com/image.jpg"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleImageUrlSubmit}
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  setShowImageModal(false);
+                  pendingPlaceholderRef.current = null;
+                  setImageUrlInput('');
+                }}
+                className="px-4 py-2 text-gray-700 font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
