@@ -12,6 +12,22 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   const [fontWeight, setFontWeight] = useState('400');
   const [showFontDialog, setShowFontDialog] = useState(false);
   const [tempSelectedFont, setTempSelectedFont] = useState('BauerMediaSans-Regular');
+  const [showColorCombos, setShowColorCombos] = useState(false);
+
+  const colorCombos = [
+    { label: 'Lavender and Mint',            colors: [{ name: 'Lavender',       hex: '#a096ff' }, { name: 'Mint',         hex: '#1fd1bd' }] },
+    { label: 'Taffy and Aqua',               colors: [{ name: 'Taffy',          hex: '#ff78c8' }, { name: 'Aqua',         hex: '#5af0ff' }] },
+    { label: 'Lavender and Lemon',           colors: [{ name: 'Lavender',       hex: '#a096ff' }, { name: 'Lemon',        hex: '#fff050' }] },
+    { label: 'Lemon and Aqua',               colors: [{ name: 'Lemon',          hex: '#fff050' }, { name: 'Aqua',         hex: '#5af0ff' }] },
+    { label: 'Mint and Light Taffy',         colors: [{ name: 'Mint',           hex: '#1fd1bd' }, { name: 'Light Taffy',  hex: '#ffd2eb' }] },
+    { label: 'Taffy and Dark Mint',          colors: [{ name: 'Taffy',          hex: '#ff78c8' }, { name: 'Dark Mint',    hex: '#009392' }] },
+    { label: 'Light Lavender and Dark Aqua', colors: [{ name: 'Light Lavender', hex: '#e1dcff' }, { name: 'Dark Aqua',    hex: '#349cdc' }] },
+    { label: 'Light Lavender and Dark Taffy',colors: [{ name: 'Light Lavender', hex: '#e1dcff' }, { name: 'Dark Taffy',   hex: '#d54380' }] },
+    { label: 'Dark Lemon and Dark Aqua',     colors: [{ name: 'Dark Lemon',     hex: '#f0a800' }, { name: 'Dark Aqua',    hex: '#349cdc' }] },
+    { label: 'Dark Lemon and Dark Taffy',    colors: [{ name: 'Dark Lemon',     hex: '#f0a800' }, { name: 'Dark Taffy',   hex: '#d54380' }] },
+    { label: 'Light Lavender and Light Mint',colors: [{ name: 'Light Lavender', hex: '#e1dcff' }, { name: 'Light Mint',   hex: '#befaeb' }] },
+    { label: 'Light Lemon and Light Taffy',  colors: [{ name: 'Light Lemon',    hex: '#ffffc8' }, { name: 'Light Taffy',  hex: '#ffd2eb' }] },
+  ];
 
   const fontsOptions = [
     { key: 'BauerMediaSans-Light', label: 'BauerMediaSans Light', family: 'BauerMediaSans', weight: '300' },
@@ -163,8 +179,10 @@ export default function Sidebar({ canvas, selectedObject, template }) {
         }
 
         img.set({
-          left: 50,
-          top: 50
+          left: canvas.width / 2,
+          top: canvas.height / 2,
+          originX: 'center',
+          originY: 'center'
         });
 
         canvas.add(img);
@@ -418,6 +436,37 @@ export default function Sidebar({ canvas, selectedObject, template }) {
                   onChange={(e) => handleTextColorChange(e.target.value)}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm text-gray-900"
                 />
+              </div>
+
+              {/* Color Combos */}
+              <div>
+                <button
+                  onClick={() => setShowColorCombos(!showColorCombos)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold text-gray-700 transition-colors"
+                >
+                  <span>Color Combos</span>
+                  <span>{showColorCombos ? '▲' : '▼'}</span>
+                </button>
+                {showColorCombos && (
+                  <div className="mt-2 space-y-1">
+                    {colorCombos.map((combo, i) => (
+                      <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50">
+                        <span className="flex-1 text-xs text-gray-600">{combo.label}</span>
+                        <div className="flex gap-1">
+                          {combo.colors.map(({ name, hex }) => (
+                            <button
+                              key={hex}
+                              title={`${name} ${hex}`}
+                              onClick={() => handleTextColorChange(hex)}
+                              className="w-6 h-6 rounded-full border-2 border-black hover:scale-110 transition-transform"
+                              style={{ backgroundColor: hex }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>  
           </div>

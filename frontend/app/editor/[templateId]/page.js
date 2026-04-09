@@ -3,7 +3,8 @@
 import { getTemplate } from '@/lib/templates';
 import CanvasEditor from '@/components/CanvasEditor';
 import Sidebar from '@/components/Sidebar';
-import { useState, use, useCallback } from 'react';
+import { useState, use, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { FabricImage } from 'fabric';
 
 const logoImages = [
@@ -19,7 +20,23 @@ const logoImages = [
 
 export default function EditorPage({ params }) {
   const { templateId } = use(params);
-  const template = getTemplate(templateId);
+  const searchParams = useSearchParams();
+
+  const template = useMemo(() => {
+    if (templateId === 'custom') {
+      return {
+        id: 'custom',
+        name: 'Custom',
+        width: parseInt(searchParams.get('width'), 10) || 800,
+        height: parseInt(searchParams.get('height'), 10) || 600,
+        description: 'Custom resolution',
+        logo: { widthRatio: 0.20, leftRatio: 0.06, topRatio: 0.05 },
+      };
+    }
+    return getTemplate(templateId);
+  // searchParams identity is stable; primitive values from get() are compared by value via deps below
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId, searchParams.get('width'), searchParams.get('height')]);
   const [canvas, setCanvas] = useState(null);
   const [selectedObject, setSelectedObject] = useState(null);
 
