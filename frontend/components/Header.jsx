@@ -43,13 +43,13 @@ export default function Header({ isAdmin, handleLogout }) {
         >
           <div className="flex flex-col gap-0 min-w-max">
             {isAdmin && (
-              <Link
-                href="/register"
-                onClick={() => setMenuOpen(false)}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-t-lg transition text-center"
-              >
-                + Criar Usuário
-              </Link>
+                <Link
+                    href="/Register"
+                    onClick={() => setMenuOpen(false)}
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-t-lg transition text-center"
+                >
+                    + Criar Usuário
+                </Link>
             )}
             <button
               onClick={() => { handleLogout(); setMenuOpen(false); }}
