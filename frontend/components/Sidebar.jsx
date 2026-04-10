@@ -208,6 +208,14 @@ export default function Sidebar({ canvas, selectedObject, template }) {
     }
   };
 
+  // Mirror image
+  const handleMirrorImage = () => {
+    if (selectedObject && selectedObject.type === 'image') {
+      selectedObject.set('flipX', !selectedObject.flipX);
+      canvas.renderAll();
+    }
+  };
+
   // Download PNG
   const handleDownload = () => {
     if (!canvas) return;
@@ -618,7 +626,22 @@ export default function Sidebar({ canvas, selectedObject, template }) {
           />
           <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
         </div>
+
+        {selectedObject && selectedObject.type === 'image' && (
+          <div className="mt-4">
+            <button
+              onClick={handleMirrorImage}
+              className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+            >
+              ↔ Mirror Image
+            </button>
+          </div>
+        )}
       </div>
+
+
+
+
 
         {/* Layer Controls */}
         {selectedObject && (

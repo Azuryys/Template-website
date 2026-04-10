@@ -1,26 +1,47 @@
 import { Rect, Textbox } from 'fabric';
 
-export const initializeEmailHeader = () => {
+/**
+ * Initialize email header template with coordinate-based positioning
+ * @param {Object} template - Template configuration from templates.js
+ * @returns {Array} Array of Fabric objects
+ */
+export const initializeEmailHeader = (template) => {
   const elements = [];
 
   // Canvas dimensions
-  const CANVAS_WIDTH = 1200;
-  const CANVAS_HEIGHT = 630;
+  const CANVAS_WIDTH = template.width || 1200;
+  const CANVAS_HEIGHT = template.height || 630;
 
-  // Block dimensions & position (centered, near bottom)
-  const blockWidth = 900;
-  const blockHeight = 210;
-  const blockLeft = (CANVAS_WIDTH - blockWidth) / 2; // 150
-  const blockBottomMargin = 30;
-  const blockTop = CANVAS_HEIGHT - blockHeight - blockBottomMargin; // 390
+  // Get positioning configurations from template
+  const imagePlaceholderConfig = template.imagePlaceholder || {
+    leftRatio: 0,
+    topRatio: 0,
+    widthRatio: 1,
+    heightRatio: 0.7857
+  };
+  const colorBlockConfig = template.colorBlock || {
+    widthRatio: 0.75,
+    heightRatio: 0.3333,
+    leftRatio: 0.125,
+    topRatio: 0.619
+  };
+  const textBoxConfig = template.textBox || {
+    widthRatio: 0.75,
+    heightRatio: 0.3333,
+    leftRatio: 0.125,
+    topRatio: 0.619,
+    fontSize: 32,
+    textAlign: 'center'
+  };
 
-  // Image placeholder: full width, top=0, ends at vertical midpoint of block
-  const blockMidY = blockTop + blockHeight / 2; // 495
+  // Create image placeholder (grey square) using ratio-based positioning
+  const imagePlaceholderWidth = CANVAS_WIDTH * imagePlaceholderConfig.widthRatio;
+  const imagePlaceholderHeight = CANVAS_HEIGHT * imagePlaceholderConfig.heightRatio;
   const imagePlaceholder = new Rect({
-    left: 0,
-    top: 0,
-    width: CANVAS_WIDTH,
-    height: blockMidY, // reaches halfway into the block
+    left: CANVAS_WIDTH * imagePlaceholderConfig.leftRatio,
+    top: CANVAS_HEIGHT * imagePlaceholderConfig.topRatio,
+    width: imagePlaceholderWidth,
+    height: imagePlaceholderHeight,
     fill: '#f3f4f6',
     stroke: '#d1d5db',
     strokeWidth: 2,
@@ -32,12 +53,14 @@ export const initializeEmailHeader = () => {
   });
   elements.push(imagePlaceholder);
 
-  // Color block: centered, near bottom (added after image so it renders on top)
+  // Color block (purple rectangle) using ratio-based positioning
+  const colorBlockWidth = CANVAS_WIDTH * colorBlockConfig.widthRatio;
+  const colorBlockHeight = CANVAS_HEIGHT * colorBlockConfig.heightRatio;
   const colorBlock = new Rect({
-    left: blockLeft,
-    top: blockTop,
-    width: blockWidth,
-    height: blockHeight,
+    left: CANVAS_WIDTH * colorBlockConfig.leftRatio,
+    top: CANVAS_HEIGHT * colorBlockConfig.topRatio,
+    width: colorBlockWidth,
+    height: colorBlockHeight,
     fill: '#4700a3',
     rx: 10,
     ry: 10,
@@ -47,16 +70,18 @@ export const initializeEmailHeader = () => {
   });
   elements.push(colorBlock);
 
-  // Text: centered over the block, added last so it's in front
+  // Text box using ratio-based positioning
+  const textBoxWidth = CANVAS_WIDTH * textBoxConfig.widthRatio;
+  const textBoxHeight = CANVAS_HEIGHT * textBoxConfig.heightRatio;
   const textBox = new Textbox('Coloque Texto', {
-    left: blockLeft,
-    top: blockTop + (blockHeight / 2) - 20, // vertically centered in block
-    width: blockWidth,
-    fontSize: 32,
+    left: CANVAS_WIDTH * textBoxConfig.leftRatio,
+    top: CANVAS_HEIGHT * textBoxConfig.topRatio + (textBoxHeight / 2) - 20,
+    width: textBoxWidth,
+    fontSize: textBoxConfig.fontSize || 32,
     fontFamily: 'BauerMediaSans',
     fontWeight: 400,
-    fill: '#ffffff', // white text over purple block
-    textAlign: 'center',
+    fill: '#ffffff',
+    textAlign: textBoxConfig.textAlign || 'center',
     hasControls: true,
     selectable: true,
     editable: true,

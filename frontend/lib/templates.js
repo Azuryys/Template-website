@@ -1,11 +1,20 @@
 // Template configurations for different banner sizes.
 //
-// Each template has an optional `logo` placement config:
-//   widthRatio  — logo width as a fraction of canvas width  (e.g. 0.4 = 40%)
-//   leftRatio   — left edge as a fraction of canvas width
-//   topRatio    — top edge as a fraction of canvas height
+// Coordinate-based positioning system for all elements using ratios:
 //
-// Adjust these three values per template to fine-tune logo placement.
+// Each element (logo, imagePlaceholder, colorBlock, textBox) can have placement config:
+//   widthRatio   — element width as a fraction of canvas width  (e.g. 0.4 = 40%)
+//   heightRatio  — element height as a fraction of canvas height (optional)
+//   leftRatio    — left edge as a fraction of canvas width
+//   topRatio     — top edge as a fraction of canvas height
+//
+// For email-header template, configure all four header elements:
+// - logo: Top-right corner logo image
+// - imagePlaceholder: Grey square at top (image upload area)
+// - colorBlock: Purple rectangle at bottom (main content area)
+// - textBox: Text content inside colorBlock
+//
+// Single-line positioning: Update ratios to adjust element positions on canvas.
 export const templates = {
   // --- Portrait / Tall Formats ---
   'half-page-ad': {
@@ -127,10 +136,41 @@ export const templates = {
   'email-header': {
     id: 'email-header',
     name: 'Email Header',
-    width: 1200,
+    width: 1000,
     height: 630,
     description: 'Email header with image, text, and block',
-    logo: { widthRatio: 0.15, leftRatio: 0.80, topRatio: 0.05 }
+    logo: { widthRatio: 0.15, leftRatio: 0.80, topRatio: 0.05 },
+    audioLogo: { 
+    widthRatio: 0.7  , 
+    horizontalStretch: 1.2 ,
+    verticalStretch: 1.1 ,
+    leftRatio: 0.773, 
+    topRatio: 0.332 ,
+},
+
+    // Image placeholder (grey square at top)
+    imagePlaceholder: { 
+      leftRatio: 0.5, 
+      topRatio: 0.45, 
+      widthRatio: 1, 
+      heightRatio: 0.9 // 495px / 630px
+    },
+    // Color block (purple rectangle at bottom)
+    colorBlock: { 
+      widthRatio: 0.9,     // 900px / 1200px
+      heightRatio: 0.3333,  // 210px / 630px
+      leftRatio: 0.501,     // 150px / 1200px (centered)
+      topRatio: 0.825       // 390px / 630px
+    },
+    // Text box (content inside color block)
+    textBox: { 
+      widthRatio: 0.9,     // 900px / 1200px
+      heightRatio: 0.3333,  // 210px / 630px
+      leftRatio: 0.5,     // 150px / 1200px
+      topRatio: 0.7,      // 390px / 630px
+      fontSize: 80,
+      textAlign: 'center'
+    }
   }
 };
 

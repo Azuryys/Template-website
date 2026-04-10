@@ -18,6 +18,100 @@ const logoImages = [
   { name: 'Mint', file: 'Logo_mint.png' },
   { name: 'Taffy', file: 'Logo_taffy.png' },
 ];
+const AudiologoImages = [
+  { name: 'Mint', file: 'Mint.png' },
+  { name: 'Light Mint', file: 'Light_Mint.png' },
+  { name: 'Dark Mint', file: 'Dark_Mint.png' },
+  { name: 'Lavender', file: 'Lavender.png' },
+  { name: 'Light Lavender', file: 'Light_Lavender.png' },
+  { name: 'Dark Lavender', file: 'Dark_Lavender.png' },
+  { name: 'Peach', file: 'Peach.png' },
+  { name: 'Light Peach', file: 'Light_Peach.png' },
+  { name: 'Dark Peach', file: 'Dark_Peach.png' },
+  { name: 'Lemon', file: 'Lemon.png' },
+  { name: 'Light Lemon', file: 'Light_Lemon.png' },
+  { name: 'Dark Lemon', file: 'Dark_Lemon.png' },
+  { name: 'Aqua', file: 'Aqua.png' },
+  { name: 'Light Aqua', file: 'Light_Aqua.png' },
+  { name: 'Dark Aqua', file: 'Dark_Aqua.png' },
+  { name: 'Taffy', file: 'Taffy.png' },
+  { name: 'Light Taffy', file: 'Light_Taffy.png' },
+  { name: 'Dark Taffy', file: 'Dark_Taffy.png' },
+];
+
+const colorGroups = {
+  Mint:     ['Mint', 'Light Mint', 'Dark Mint'],
+  Lavender: ['Lavender', 'Light Lavender', 'Dark Lavender'],
+  Peach:    ['Peach', 'Light Peach', 'Dark Peach'],
+  Lemon:    ['Lemon', 'Light Lemon', 'Dark Lemon'],
+  Aqua:     ['Aqua', 'Light Aqua', 'Dark Aqua'],
+  Taffy:    ['Taffy', 'Light Taffy', 'Dark Taffy'],
+};
+
+function AudioLogoMenu({ handleAddAudioLogo }) {
+  const [openColor, setOpenColor] = useState(null);
+
+  const findLogo = (name) => AudiologoImages.find((l) => l.name === name);
+
+  return (
+    <div className="relative">
+      {/* Main dropdown trigger */}
+      <div className="relative group">
+        <button className="text-gray-700 hover:text-gray-900 font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors">
+          Audio Logo ▾
+        </button>
+
+        {/* Color list */}
+        <div className="absolute left-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 py-1">
+          {Object.entries(colorGroups).map(([color, variants]) => (
+            <div
+              key={color}
+              className="relative"
+              onMouseEnter={() => setOpenColor(color)}
+              onMouseLeave={() => setOpenColor(null)}
+            >
+              {/* Color row */}
+              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between transition-colors">
+                <span>{color}</span>
+                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              {/* Variants submenu */}
+              {openColor === color && (
+                <div className="absolute left-full top-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2">
+                  <div className="grid grid-cols-1 gap-1">
+                    {variants.map((variantName) => {
+                      const logo = findLogo(variantName);
+                      if (!logo) return null;
+                      return (
+                        <button
+                          key={logo.file}
+                          onClick={() => handleAddAudioLogo(logo.file)}
+                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors text-left"
+                        >
+                          <div className="w-10 h-10 flex items-center justify-center bg-gray-50 rounded border border-gray-100">
+                            <img
+                              src={`/BauerImages/Logo_Audio/${logo.file}`}
+                              alt={logo.name}
+                              className="max-h-8 max-w-full object-contain"
+                            />
+                          </div>
+                          <span className="text-xs text-gray-600">{logo.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function EditorPage({ params }) {
   const { templateId } = use(params);
@@ -65,7 +159,7 @@ export default function EditorPage({ params }) {
     // Initialize template-specific preloaded elements
     const initializer = getTemplateInitializer(templateId);
     if (initializer) {
-      const elements = initializer();
+      const elements = initializer(template);
       elements.forEach((element) => {
         canvasInstance.add(element);
       });
@@ -78,7 +172,7 @@ export default function EditorPage({ params }) {
         handlePlaceholderClick(options.target);
       }
     });
-  }, [templateId]);
+  }, [templateId, template]);
 
   const handleSelectionChange = useCallback((obj) => {
     setSelectedObject(obj);
@@ -272,6 +366,40 @@ export default function EditorPage({ params }) {
     });
   };
 
+  const handleAddAudioLogo = (file) => {
+    if (!canvas) return;
+    const url = `/BauerImages/Logo_Audio/${file}`;
+    FabricImage.fromURL(url, { crossOrigin: 'anonymous' }).then((img) => {
+      const placement = template.audioLogo ?? { 
+        widthRatio: 0.20,        // base reference size
+        leftRatio: 0.06, 
+        topRatio: 0.05,
+        horizontalStretch: 1.0,  // 1.0 = normal width
+        verticalStretch: 1.0     // 1.0 = normal height
+      };
+      
+      // Calculate base scale from widthRatio (used as reference)
+      const baseSize = canvas.width * placement.widthRatio;
+      const baseScale = baseSize / img.width;
+      
+      // Apply independent stretch factors
+      const hStretch = placement.horizontalStretch ?? 1.0;
+      const vStretch = placement.verticalStretch ?? 1.0;
+      
+      img.set({
+        left: canvas.width * placement.leftRatio,
+        top: canvas.height * placement.topRatio,
+        scaleX: -baseScale * hStretch,   // negative for flip
+        scaleY: baseScale * vStretch,    // vertical stretch independent
+      });
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.renderAll();
+    });
+  };
+
+
+
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Top Bar */}
@@ -292,6 +420,7 @@ export default function EditorPage({ params }) {
               {template.width} × {template.height}
             </span>
             <div className="border-l border-gray-300 h-6"></div>
+            
             {/* Logo Dropdown */}
             <div className="relative group">
               <button className="text-gray-700 hover:text-gray-900 font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors">
@@ -319,7 +448,8 @@ export default function EditorPage({ params }) {
               </div>
             </div>
 
-            {/* Save as Template Button */}
+            {/* Audio Logo Menu */}
+            <AudioLogoMenu handleAddAudioLogo={handleAddAudioLogo} />
             <button
               onClick={() => setShowSaveModal(true)}
               className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
