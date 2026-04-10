@@ -34,10 +34,8 @@ export default function LoginPage() {
         localStorage.setItem('user', JSON.stringify(user));
         // Armazenar senha temporariamente (apenas para demo)
         localStorage.setItem('userPassword', password);
-        // Redirecionar para dashboard
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 500);
+        // Redirecionar para dashboard automaticamente
+        router.push('/dashboard');
       } else {
         // ❌ Credenciais inválidas
         setError('Email ou senha inválidos');
