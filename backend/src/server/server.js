@@ -1,7 +1,7 @@
 /**
  * BACKEND - Servidor principal da aplicação
  * Porta: 3001
- * Responsável por: Autenticação, recuperação de senha e rotas da API
+ * Responsável por: Autenticação, recuperação de senha, upload de avatar e rotas da API
  */
 
 import express from 'express';
@@ -9,13 +9,29 @@ import cors from 'cors';
 import 'dotenv/config';
 import { auth } from '../../auth.js';
 import { pool } from './lib/db.js';  // ← importa Pool do db.js (conexão com PostgreSQL)
+import { fromNodeHeaders } from 'better-auth/node';
+import { v4 as uuidv4 } from 'uuid';
+import { writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // Middleware CORS - permite requisições do frontend (localhost:3000)
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  credentials: true
+}));
 // Middleware para parsear JSON nos requests
 app.use(express.json());
+
+// ============================================
+// SERVIR AVATARES ESTATICAMENTE
+// ============================================
+const avatarsDir = join(__dirname, '..', '..', 'public', 'avatars');
+await mkdir(avatarsDir, { recursive: true });
+app.use('/avatars', express.static(avatarsDir));
 
 // Rota de health-check - verifica se o backend está rodando
 app.get('/', (req, res) => {
@@ -24,6 +40,86 @@ app.get('/', (req, res) => {
 
 // Better Auth - comentado por enquanto (causa conflito com rotas customizadas)
 // app.all("/api/auth/*", auth.handler);
+
+// ============================================
+// ROTAS CUSTOM - UPLOAD DE AVATAR
+// ============================================
+
+/**
+ * POST /api/user/avatar
+ * FUNÇÃO: Fazer upload de foto de perfil
+ * RECEBE: { image: string (base64) }
+ * RETORNA: { success: true, avatarUrl: string } ou erro
+ * AUTENTICAÇÃO: Requer sessão válida do Better Auth
+ */
+app.post('/api/user/avatar', express.json({ limit: '10mb' }), async (req, res) => {
+  try {
+    // Verificar autenticação com Better Auth
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+
+    if (!session || !session.user) {
+      return res.status(401).json({ error: 'Não autenticado' });
+    }
+
+    const { image } = req.body;
+    
+    if (!image) {
+      return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+    }
+
+    // Validar base64
+    if (!image.startsWith('data:image')) {
+      return res.status(400).json({ error: 'Formato inválido. Use JPG, PNG ou WebP' });
+    }
+
+    // Extrair tipo e dados
+    const matches = image.match(/^data:image\/(\w+);base64,(.+)$/);
+    if (!matches) {
+      return res.status(400).json({ error: 'Base64 inválido' });
+    }
+
+    const [, ext, base64Data] = matches;
+    const allowedTypes = ['jpeg', 'jpg', 'png', 'webp'];
+    
+    if (!allowedTypes.includes(ext)) {
+      return res.status(400).json({ error: 'Tipo não suportado (use JPG, PNG, WebP)' });
+    }
+
+    // Verificar tamanho (aproximado ~2MB)
+    const sizeInBytes = (base64Data.length * 3) / 4;
+    if (sizeInBytes > 2 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Imagem demasiado grande (máx 2MB)' });
+    }
+
+    // Guardar ficheiro
+    const fileName = `${uuidv4()}.${ext}`;
+    const filePath = join(avatarsDir, fileName);
+    const buffer = Buffer.from(base64Data, 'base64');
+    await writeFile(filePath, buffer);
+
+    // URL completa do backend
+    const avatarUrl = `http://localhost:${process.env.PORT || 5000}/avatars/${fileName}`;
+
+    // Atualizar na base de dados (tabela user do Better Auth)
+    await pool.query(
+      'UPDATE "user" SET image = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2',
+      [avatarUrl, session.user.id]
+    );
+
+    console.log(`✅ Avatar atualizado: ${session.user.email} → ${fileName}`);
+
+    res.json({ 
+      success: true, 
+      avatarUrl 
+    });
+
+  } catch (error) {
+    console.error('Erro no upload de avatar:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
 
 // ============================================
 // ROTAS CUSTOM - RECUPERAÇÃO DE SENHA
@@ -201,4 +297,5 @@ app.post('/api/auth/register', async (req, res) => {
 const PORT = process.env.PORT || 5000;  // Porta 3001 (vem do .env)
 app.listen(PORT, () => {
   console.log(`🚀 Backend: http://localhost:${PORT}`);
+  console.log(`📁 Avatars: ${avatarsDir}`);
 });

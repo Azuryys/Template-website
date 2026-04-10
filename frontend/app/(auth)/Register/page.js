@@ -238,6 +238,20 @@ export default function RegisterPage() {
                        outline-none transition bg-white"
               />
             </div>
+             {/* Admin or not */}
+            <div>
+              <label htmlFor="isAdmin" className="block text-sm font-medium text-gray-700 mb-2">
+                É Administrador?
+              </label>
+              <input
+                id="isAdmin"
+                type="checkbox"
+                name="isAdmin"
+                checked={formData.isAdmin}
+                onChange={handleChange}
+                className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+            </div>
 
             {/* Error Message */}
             {error && (
