@@ -167,11 +167,11 @@ export default function EditorPage({ params }) {
     }
 
     // Handle placeholder click events
-    canvasInstance.on('mouse:down', (options) => {
-      if (options.target && options.target.isPlaceholder) {
-        handlePlaceholderClick(options.target);
-      }
-    });
+    canvasInstance.on('mouse:dblclick', (options) => {
+  if (options.target && options.target.isPlaceholder) {
+    handlePlaceholderClick(options.target);
+  }
+});
   }, [templateId, template]);
 
   const handleSelectionChange = useCallback((obj) => {
@@ -312,41 +312,40 @@ export default function EditorPage({ params }) {
   };
 
   const insertImageIntoPlaceholder = (imageSource) => {
-    const placeholder = pendingPlaceholderRef.current;
-    if (!canvas || !placeholder) return;
+  const placeholder = pendingPlaceholderRef.current;
+  if (!canvas || !placeholder) return;
 
-    const placeholderWidth = placeholder.width;
-    const placeholderHeight = placeholder.height;
-    const placeholderLeft = placeholder.left;
-    const placeholderTop = placeholder.top;
+  // Use bounding rect to get the true rendered position and size
+  const boundingRect = placeholder.getBoundingRect();
+  const placeholderLeft = boundingRect.left;
+  const placeholderTop = boundingRect.top;
+  const placeholderWidth = boundingRect.width;
+  const placeholderHeight = boundingRect.height;
 
-    FabricImage.fromURL(imageSource, { crossOrigin: 'anonymous' }).then((img) => {
-      const targetWidth = placeholderWidth;
-      const targetHeight = placeholderHeight;
+  FabricImage.fromURL(imageSource, { crossOrigin: 'anonymous' }).then((img) => {
+    const scaleX = placeholderWidth / img.width;
+    const scaleY = placeholderHeight / img.height;  
+    const scale = Math.min(scaleX, scaleY);
 
-      const scaleX = targetWidth / img.width;
-      const scaleY = targetHeight / img.height;
-      const scale = Math.min(scaleX, scaleY);
-
-      img.scale(scale);
-      img.set({
-        left: placeholderLeft + targetWidth / 2,
-        top: placeholderTop + targetHeight / 2,
-        originX: 'center',
-        originY: 'center',
-        name: 'headerImage',
-      });
-
-      canvas.remove(placeholder);
-      canvas.add(img);
-      canvas.renderAll();
-      pendingPlaceholderRef.current = null;
-      setShowImageModal(false);
-    }).catch((error) => {
-      console.error('Error loading image:', error);
-      alert('Failed to load image. Please check the URL or try a different image.');
+    img.scale(scale);
+    img.set({
+      left: placeholderLeft + placeholderWidth / 2,
+      top: placeholderTop + placeholderHeight / 2,
+      originX: 'center',
+      originY: 'center',
+      name: 'headerImage',
     });
-  };
+
+    canvas.remove(placeholder);
+    canvas.add(img);
+    canvas.renderAll();
+    pendingPlaceholderRef.current = null;
+    setShowImageModal(false);
+  }).catch((error) => {
+    console.error('Error loading image:', error);
+    alert('Failed to load image. Please check the URL or try a different image.');
+  });
+};
 
   const handleAddLogo = (file) => {
     if (!canvas) return;
