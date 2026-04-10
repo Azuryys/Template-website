@@ -152,6 +152,52 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/auth/register
+ * FUNÇÃO: Registar um novo utilizador
+ * RECEBE: { email: string, password: string, name: string }
+ * RETORNA: { message: 'Utilizador registado com sucesso' } ou erro
+ * PROCESSO:
+ *   1. Valida o email
+ *   2. Verifica se o email já existe
+ *   3. Insere o novo utilizador na tabela user
+ *   4. Retorna sucesso
+ */
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+
+    // Validação: email é obrigatório e deve ser válido
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Email válido é obrigatório' });
+    }
+
+    // Validação: senha é obrigatória
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres' });
+    }
+
+    // Verifica se o email já existe na tabela user
+    const existingUser = await pool.query('SELECT id FROM "user" WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'Email já está registado' });
+    }
+
+    // Insere o novo utilizador (name é opcional)
+    await pool.query(
+      'INSERT INTO "user" (email) VALUES ($1)',
+      [email]
+    );
+
+    console.log(`✅ Novo utilizador registado: ${email}`);
+    res.json({ message: 'Utilizador registado com sucesso' });
+
+  } catch (error) {
+    console.error('Erro no registo:', error);
+    res.status(500).json({ error: 'Falha ao registar utilizador' });
+  }
+});
+
 // ============================================
 // INICIALIZAÇÃO DO SERVIDOR
 // ============================================

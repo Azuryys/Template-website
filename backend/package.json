@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node src/server/server.js",
-    "dev": "nodemon src/server/server.js"
+    "dev": "nodemon src/server/server.js",
+    "migrate": "node scripts/create-tables.js",
+    "seed": "node scripts/seed-users.js",
+    "check-db": "node scripts/check-tables.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
