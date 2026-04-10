@@ -144,11 +144,14 @@ export default function RegisterPage() {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Criar Novo Usuário
           </h1>
-          <p className="text-gray-600 text-base">
+         {/* <p className="text-gray-600 text-base">
             Apenas administradores podem criar novos usuários
-          </p>
+          </p>*/}
           <p className="text-sm text-blue-600 mt-2">
-            Logado como: <strong>{user?.name}</strong>
+            Logado como: 
+          </p>
+          <p className='text-sm text-blue-600 mt-2'>
+            <strong>{user?.name}</strong>
           </p>
         </div>
 
@@ -166,9 +169,12 @@ export default function RegisterPage() {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="João Silva"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                className="
+                       w-full px-4 py-3 border border-gray-300 rounded-lg 
+                       text-black placeholder-gray-400
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       outline-none transition bg-white"
               />
             </div>
 
@@ -183,9 +189,12 @@ export default function RegisterPage() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="novo@email.com"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                className="
+                       w-full px-4 py-3 border border-gray-300 rounded-lg 
+                       text-black placeholder-gray-400
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       outline-none transition bg-white"
               />
             </div>
 
@@ -200,9 +209,12 @@ export default function RegisterPage() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="••••••••"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                className="
+                       w-full px-4 py-3 border border-gray-300 rounded-lg 
+                       text-black placeholder-gray-400
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       outline-none transition bg-white"
               />
               <p className="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
             </div>
@@ -218,9 +230,12 @@ export default function RegisterPage() {
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                placeholder="••••••••"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                className="
+                       w-full px-4 py-3 border border-gray-300 rounded-lg 
+                       text-black placeholder-gray-400
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       outline-none transition bg-white"
               />
             </div>
 

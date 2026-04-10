@@ -82,9 +82,13 @@ export default function PasswordRecoverPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
+                placeholder="Email"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 outline-none"
+                className="
+                       w-full px-4 py-3 border border-gray-300 rounded-lg 
+                       text-black placeholder-gray-400
+                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                       outline-none transition bg-white"
               />
             </div>
 

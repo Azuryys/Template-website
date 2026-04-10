@@ -61,11 +61,7 @@ app.post('/api/auth/recover', async (req, res) => {
     const recoveryCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Salva o código na base de dados com expiração de 1 hora
-    await pool.query(
-      `INSERT INTO recovery_codes (email, code, expires_at) 
-       VALUES ($1, $2, NOW() + INTERVAL '1 hour')`,
-      [email, recoveryCode]
-    );
+    //removido
 
     // Log para debug - mostra o email e código gerado no console
     console.log(`📧 EMAIL: ${email} | 🔑 CÓDIGO: ${recoveryCode}`);

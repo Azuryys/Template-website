@@ -33,4 +33,9 @@ export const ENV =  {
     // URL base do servidor (usado para callbacks/redirects de autenticação)
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
 
+
+    // ========== RESEND (ENVIO DE EMAILS) ==========
+    RESEND_API_KEY: process.env.RESEND_API_KEY, // Chave de API do Resend
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL, // Email remetente para envios
+
 };

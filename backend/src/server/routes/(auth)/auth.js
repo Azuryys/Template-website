@@ -5,6 +5,9 @@ const { sendRecoveryEmail } = require('../lib/email');
 
 // POST /api/auth/recover
 router.post('/recover', async (req, res) => {
+   console.log('🔔 sendResetPassword chamado!');
+    console.log('User:', user.email);
+    console.log('URL:', url);
   try {
     const { email } = req.body;
 

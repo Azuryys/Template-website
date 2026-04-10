@@ -155,12 +155,12 @@ export default function LoginPage() {
 
           {/* Register Link */}
           <div className="mt-6 text-center">
-             <p className="text-gray-600 text-sm">
+             {/*<p className="text-gray-600 text-sm">
               Ainda não tem conta?{' '}
               <Link href="/SelfRegister" className="text-blue-600 hover:text-blue-700 font-semibold">
                 Registar-se aqui
               </Link>
-            </p>
+            </p>*/}
           </div>
         </div>
 
