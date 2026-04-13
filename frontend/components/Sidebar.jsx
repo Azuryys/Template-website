@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Textbox, FabricImage } from 'fabric';
 import styles from './Sidebar.module.css';
+import autoAnimate from '@formkit/auto-animate';
 
-export default function Sidebar({ canvas, selectedObject, template }) {
+export default function Sidebar({ canvas, selectedObject, template, onClearCanvas }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [textColor, setTextColor] = useState('#000000');
   const [fontSize, setFontSize] = useState(24);
@@ -13,6 +14,90 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   const [showFontDialog, setShowFontDialog] = useState(false);
   const [tempSelectedFont, setTempSelectedFont] = useState('BauerMediaSans-Regular');
   const [showColorCombos, setShowColorCombos] = useState(false);
+  const [hasBackgroundImage, setHasBackgroundImage] = useState(false);
+  const [layers, setLayers] = useState([]);
+  const [draggingIndex, setDraggingIndex] = useState(null);
+  const layersListRef = useRef(null);
+
+  useEffect(() => {
+    if (layersListRef.current) {
+      autoAnimate(layersListRef.current);
+    }
+  }, [layersListRef]);
+
+  useEffect(() => {
+    if (!canvas) return;
+
+    const updateBgImageState = () => {
+      setHasBackgroundImage(!!canvas.backgroundImage);
+    };
+
+    const updateLayers = () => {
+      // make sure every layer has a consistent id for animating smoothly
+      const objs = canvas.getObjects();
+      objs.forEach((obj, idx) => {
+        if (!obj.id) obj.id = `layer-${Date.now()}-${idx}-${Math.random()}`;
+      });
+      setLayers([...objs].reverse());
+    };
+
+    updateBgImageState();
+    updateLayers();
+    
+    canvas.on('after:render', updateBgImageState);
+    canvas.on('after:render', updateLayers);
+    canvas.on('object:added', updateLayers);
+    canvas.on('object:removed', updateLayers);
+    canvas.on('object:modified', updateLayers);
+    canvas.on('selection:updated', updateLayers);
+    canvas.on('selection:created', updateLayers);
+    canvas.on('selection:cleared', updateLayers);
+
+    return () => {
+      canvas.off('after:render', updateBgImageState);
+      canvas.off('after:render', updateLayers);
+      canvas.off('object:added', updateLayers);
+      canvas.off('object:removed', updateLayers);
+      canvas.off('object:modified', updateLayers);
+      canvas.off('selection:updated', updateLayers);
+      canvas.off('selection:created', updateLayers);
+      canvas.off('selection:cleared', updateLayers);
+    };
+  }, [canvas]);
+
+  const handleDragStart = (e, index) => {
+    setDraggingIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    
+    // Create an empty drag image so the default ghost image is hidden
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    e.dataTransfer.setDragImage(img, 0, 0);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    if (draggingIndex === null || draggingIndex === dropIndex) return;
+
+    const draggedLayer = layers[draggingIndex];
+    if (!draggedLayer || !canvas) return;
+
+    // Convert visual array map to logical canvas
+    // visual index 0 is top (last element in fabric)
+    const objsCount = canvas.getObjects().length;
+    const currentFabricIndex = objsCount - 1 - draggingIndex;
+    const targetFabricIndex = objsCount - 1 - dropIndex;
+
+    // Fabric method to move object to an absolute layer index
+    canvas.moveObjectTo(draggedLayer, targetFabricIndex);
+    canvas.renderAll();
+    setDraggingIndex(null);
+  };
 
   const colorCombos = [
     { label: 'Lavender and Mint',            colors: [{ name: 'Lavender',       hex: '#a096ff' }, { name: 'Mint',         hex: '#1fd1bd' }] },
@@ -42,27 +127,21 @@ export default function Sidebar({ canvas, selectedObject, template }) {
     setFontWeight(opt.weight);
 
     if (canvas) {
-      if (selectedObject && selectedObject.type === 'textbox') {
-        // Update the existing selected textbox's font
-        selectedObject.set({ fontFamily: opt.family, fontWeight: opt.weight });
-        canvas.renderAll();
-      } else {
-        // No textbox selected — add a new one
-        const text = new Textbox('Click to edit', {
-          left: 100,
-          top: 100,
-          width: 200,
-          fontSize: fontSize,
-          fill: textColor,
-          fontFamily: opt.family,
-          fontWeight: opt.weight,
-          editable: true
-        });
+      // Always add a new textbox when "Add Text" is clicked
+      const text = new Textbox('Click to edit', {
+        left: 100,
+        top: 100,
+        width: 200,
+        fontSize: fontSize,
+        fill: textColor,
+        fontFamily: opt.family,
+        fontWeight: opt.weight,
+        editable: true
+      });
 
-        canvas.add(text);
-        canvas.setActiveObject(text);
-        canvas.renderAll();
-      }
+      canvas.add(text);
+      canvas.setActiveObject(text);
+      canvas.renderAll();
     }
 
     setShowFontDialog(false);
@@ -148,10 +227,20 @@ export default function Sidebar({ canvas, selectedObject, template }) {
         });
 
         canvas.backgroundImage = img;
+        setHasBackgroundImage(true);
         canvas.renderAll();
       });
     };
     reader.readAsDataURL(file);
+  };
+
+  // Clear background image
+  const handleClearBackgroundImage = () => {
+    if (canvas) {
+      canvas.backgroundImage = null;
+      setHasBackgroundImage(false);
+      canvas.renderAll();
+    }
   };
 
   // Logo/image upload
@@ -391,7 +480,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
 
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Light Shades</p>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    {[
+                    {[  
                       { name: 'Light Mint',     hex: '#befaeb' },
                       { name: 'Light Lavender', hex: '#e1dcff' },
                       { name: 'Light Peach',    hex: '#ffd2d2' },
@@ -599,12 +688,28 @@ export default function Sidebar({ canvas, selectedObject, template }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Background Image
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleBackgroundImageUpload}
-              className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
+            <div className="flex gap-2 items-center">
+              <div className={styles.fileInputWrapper}>
+                <input
+                  type="file"
+                  id="bg-image-upload"
+                  accept="image/*"
+                  onChange={handleBackgroundImageUpload}
+                  className={styles.hiddenFileInput}
+                />
+                <label htmlFor="bg-image-upload" className={`${styles.fileInputLabel} text-sm py-1 px-2 whitespace-nowrap`}>
+                  Escolher Ficheiro
+                </label>
+              </div>
+              {hasBackgroundImage && (
+                <button
+                  onClick={handleClearBackgroundImage}
+                  className="bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
           </div>
         </div>
@@ -618,12 +723,20 @@ export default function Sidebar({ canvas, selectedObject, template }) {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Upload Logo/Image
           </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-          />
+          <div className="flex gap-2 items-center">
+            <div className={styles.fileInputWrapper}>
+              <input
+                type="file"
+                id="logo-image-upload"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className={styles.hiddenFileInput}
+              />
+              <label htmlFor="logo-image-upload" className={`${styles.fileInputLabel} ${styles.fileInputLabelGreen} text-sm py-1 px-2 whitespace-nowrap`}>
+                Escolher Ficheiro
+              </label>
+            </div>
+          </div>
           <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
         </div>
 
@@ -639,34 +752,91 @@ export default function Sidebar({ canvas, selectedObject, template }) {
         )}
       </div>
 
-
-
-
-
         {/* Layer Controls */}
-        {selectedObject && (
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Layers</h3>
-            
-            <div className="flex gap-2">
-              <button
-                onClick={handleBringForward}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
-              >
-                ↑ Forward
-              </button>
-              <button
-                onClick={handleSendBackward}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
-              >
-                ↓ Backward
-              </button>
-            </div>
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Layers</h3>
           </div>
-        )}
+          
+          <div ref={layersListRef} className={`space-y-2 mb-4 max-h-48 overflow-y-auto pr-1 ${styles.layersListContainer} ${draggingIndex !== null ? styles.layersListNoDragScroll : ''}`}>
+            {layers.map((layer, index) => {
+              const type = layer.type;
+              let displayName = type;
+              if (type === 'textbox' || type === 'text') {
+                displayName = layer.text ? `Texto: ${layer.text.substring(0, 15)}...` : 'Texto';
+              } else if (type === 'image') {
+                displayName = layer.name || 'Imagem';
+              } else if (layer.isPlaceholder) {
+                displayName = 'Espaço em Branco (Imagem)';
+              } else if (type === 'rect') {
+                displayName = 'Forma (Retângulo)';
+              } else if (type === 'circle') {
+                displayName = 'Forma (Círculo)';
+              }
+              
+              const isSelected = selectedObject === layer;
 
-        {/* Download Button */}
-        <div className="p-6 mt-auto">
+              return (
+                <div 
+                  key={layer.id || layer.name || index}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onClick={() => {
+                    canvas.setActiveObject(layer);
+                    canvas.renderAll();
+                  }}
+                  className={`relative flex items-center justify-between p-2 rounded cursor-grab border transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:bg-gray-50'} ${draggingIndex === index ? 'opacity-50 ring-2 ring-blue-400' : 'opacity-100'}`}
+                >
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="text-gray-400 mr-1 cursor-grab active:cursor-grabbing hover:text-gray-600">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M4 4h2v2H4V4zm4 0h2v2H8V4zm4 0h2v2h-2V4zM4 8h2v2H4V8zm4 0h2v2H8V8zm4 0h2v2h-2V8zM4 12h2v2H4v-2zm4 0h2v2H8v-2zm4 0h2v2h-2v-2z" />
+                      </svg>
+                    </div>
+                    <div className={`w-3 h-3 rounded-full shrink-0 ${isSelected ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                    <span className={`text-sm font-medium truncate ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                      {displayName}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {layers.length === 0 && (
+              <p className="text-sm text-gray-500 text-center py-4 bg-gray-50 rounded border border-dashed border-gray-200">
+                Nenhuma camada adicionada.
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleBringForward}
+              disabled={!selectedObject}
+              className={`flex-1 py-2 px-3 rounded-lg font-medium transition-colors text-sm ${selectedObject ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-400 cursor-not-allowed'}`}
+            >
+              ↑ Forward
+            </button>
+            <button
+              onClick={handleSendBackward}
+              disabled={!selectedObject}
+              className={`flex-1 py-2 px-3 rounded-lg font-medium transition-colors text-sm ${selectedObject ? 'bg-gray-100 hover:bg-gray-200 text-gray-700' : 'bg-gray-50 text-gray-400 cursor-not-allowed'}`}
+            >
+              ↓ Backward
+            </button>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-6 mt-auto space-y-3">
+          <button
+            onClick={() => onClearCanvas && onClearCanvas()}
+            className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
+          >
+            Clear Canvas
+          </button>
           <button
             onClick={handleDownload}
             className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
