@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Textbox, FabricImage } from 'fabric';
 import styles from './Sidebar.module.css';
 
-export default function Sidebar({ canvas, selectedObject, template }) {
+export default function Sidebar({ canvas, selectedObject, template, onClearCanvas }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [textColor, setTextColor] = useState('#000000');
   const [fontSize, setFontSize] = useState(24);
@@ -13,6 +13,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
   const [showFontDialog, setShowFontDialog] = useState(false);
   const [tempSelectedFont, setTempSelectedFont] = useState('BauerMediaSans-Regular');
   const [showColorCombos, setShowColorCombos] = useState(false);
+  const [hasBackgroundImage, setHasBackgroundImage] = useState(false);
 
   const colorCombos = [
     { label: 'Lavender and Mint',            colors: [{ name: 'Lavender',       hex: '#a096ff' }, { name: 'Mint',         hex: '#1fd1bd' }] },
@@ -148,10 +149,20 @@ export default function Sidebar({ canvas, selectedObject, template }) {
         });
 
         canvas.backgroundImage = img;
+        setHasBackgroundImage(true);
         canvas.renderAll();
       });
     };
     reader.readAsDataURL(file);
+  };
+
+  // Clear background image
+  const handleClearBackgroundImage = () => {
+    if (canvas) {
+      canvas.backgroundImage = null;
+      setHasBackgroundImage(false);
+      canvas.renderAll();
+    }
   };
 
   // Logo/image upload
@@ -391,7 +402,7 @@ export default function Sidebar({ canvas, selectedObject, template }) {
 
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Light Shades</p>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    {[
+                    {[  
                       { name: 'Light Mint',     hex: '#befaeb' },
                       { name: 'Light Lavender', hex: '#e1dcff' },
                       { name: 'Light Peach',    hex: '#ffd2d2' },
@@ -599,12 +610,28 @@ export default function Sidebar({ canvas, selectedObject, template }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Background Image
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleBackgroundImageUpload}
-              className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
+            <div className="flex gap-2 items-center">
+              <div className={styles.fileInputWrapper}>
+                <input
+                  type="file"
+                  id="bg-image-upload"
+                  accept="image/*"
+                  onChange={handleBackgroundImageUpload}
+                  className={styles.hiddenFileInput}
+                />
+                <label htmlFor="bg-image-upload" className={`${styles.fileInputLabel} text-sm py-1 px-2 whitespace-nowrap`}>
+                  Escolher Ficheiro
+                </label>
+              </div>
+              {hasBackgroundImage && (
+                <button
+                  onClick={handleClearBackgroundImage}
+                  className="bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
           </div>
         </div>
@@ -618,12 +645,20 @@ export default function Sidebar({ canvas, selectedObject, template }) {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Upload Logo/Image
           </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-          />
+          <div className="flex gap-2 items-center">
+            <div className={styles.fileInputWrapper}>
+              <input
+                type="file"
+                id="logo-image-upload"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className={styles.hiddenFileInput}
+              />
+              <label htmlFor="logo-image-upload" className={`${styles.fileInputLabel} ${styles.fileInputLabelGreen} text-sm py-1 px-2 whitespace-nowrap`}>
+                Escolher Ficheiro
+              </label>
+            </div>
+          </div>
           <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
         </div>
 
@@ -638,10 +673,6 @@ export default function Sidebar({ canvas, selectedObject, template }) {
           </div>
         )}
       </div>
-
-
-
-
 
         {/* Layer Controls */}
         {selectedObject && (
@@ -665,8 +696,14 @@ export default function Sidebar({ canvas, selectedObject, template }) {
           </div>
         )}
 
-        {/* Download Button */}
-        <div className="p-6 mt-auto">
+        {/* Action Buttons */}
+        <div className="p-6 mt-auto space-y-3">
+          <button
+            onClick={() => onClearCanvas && onClearCanvas()}
+            className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
+          >
+            Clear Canvas
+          </button>
           <button
             onClick={handleDownload}
             className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"

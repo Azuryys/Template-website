@@ -3,28 +3,30 @@
 import { useEffect, useRef } from 'react';
 import useCanvasEditor from '@/hooks/useCanvasEditor';
 
-export default function CanvasEditor({ template, onCanvasReady, onSelectionChange }) {
+export default function CanvasEditor({ template, onCanvasReady, onSelectionChange, hotkeys }) {
   const canvasContainerRef = useRef(null);
   const canvasId = 'editor-canvas';
   
-  const canvas = useCanvasEditor(canvasId, template, onSelectionChange);
+  const { canvas, undo, redo, copy, paste, bringForward, sendBackward } = useCanvasEditor(canvasId, template, onSelectionChange, hotkeys);
 
   useEffect(() => {
     if (canvas && onCanvasReady) {
-      onCanvasReady(canvas);
+      onCanvasReady(canvas, { undo, redo, copy, paste, bringForward, sendBackward });
     }
-  }, [canvas, onCanvasReady]);
+  }, [canvas, undo, redo, copy, paste, bringForward, sendBackward, onCanvasReady]);
 
   return (
     <div
       ref={canvasContainerRef}
-      className="bg-white shadow-2xl rounded-lg overflow-hidden"
+      className="bg-white shadow-2xl rounded-lg"
       style={{
+        width: template.width,
+        height: template.height,
         maxWidth: '100%',
-        maxHeight: '100%'
+        margin: '0 auto',
       }}
     >
-      <canvas id={canvasId} />
+      <canvas id={canvasId} width={template.width} height={template.height} />
     </div>
   );
 }

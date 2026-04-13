@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar';
 import { useState, use, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FabricImage } from 'fabric';
+import { FaUndo, FaRedo, FaCopy, FaPaste, FaTrash, FaCog, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 
 const logoImages = [
   { name: 'Default', file: 'Logo_default.png' },
@@ -57,7 +58,7 @@ function AudioLogoMenu({ handleAddAudioLogo }) {
     <div className="relative">
       {/* Main dropdown trigger */}
       <div className="relative group">
-        <button className="text-gray-700 hover:text-gray-900 font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors">
+        <button className="text-black hover:text-black font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors">
           Audio Logo ▾
         </button>
 
@@ -141,20 +142,105 @@ export default function EditorPage({ params }) {
   const [selectedLoadTemplate, setSelectedLoadTemplate] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
+  const [canvasActions, setCanvasActions] = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [hotkeys, setHotkeys] = useState({
+    undo: { ctrl: true, key: 'z' },
+    redo: { ctrl: true, key: 'y' },
+    copy: { ctrl: true, key: 'c' },
+    paste: { ctrl: true, key: 'v' },
+    delete: { key: 'Delete' },
+    bringForward: { ctrl: true, key: ']' },
+    sendBackward: { ctrl: true, key: '[' },
+  });
+  const [recordingAction, setRecordingAction] = useState(null);
+  const [recordedKeys, setRecordedKeys] = useState({});
   const pendingPlaceholderRef = useRef(null);
 
-  // Load saved templates from localStorage
+  // Load saved templates and hotkeys from localStorage
   useEffect(() => {
     try {
       const templates = JSON.parse(localStorage.getItem('savedTemplates') || '[]');
       setSavedTemplates(templates);
+      
+      const savedHotkeys = JSON.parse(localStorage.getItem('canvasHotkeys') || '{}');
+      if (Object.keys(savedHotkeys).length > 0) {
+        setHotkeys(savedHotkeys);
+      }
     } catch (error) {
-      console.error('Error loading saved templates:', error);
+      console.error('Error loading saved data:', error);
     }
   }, []);
 
-  const handleCanvasReady = useCallback((canvasInstance) => {
+  // Helper function to format hotkey for display
+  const formatHotkey = (hotkeyObj) => {
+    if (!hotkeyObj) return '';
+    const parts = [];
+    if (hotkeyObj.ctrl) parts.push('Ctrl');
+    if (hotkeyObj.shift) parts.push('Shift');
+    if (hotkeyObj.alt) parts.push('Alt');
+    if (hotkeyObj.key) {
+      const keyDisplay = hotkeyObj.key.length === 1 ? hotkeyObj.key.toUpperCase() : hotkeyObj.key;
+      parts.push(keyDisplay);
+    }
+    return parts.join('+');
+  };
+
+  // Handle hotkey recording
+  const handleStartRecording = (action) => {
+    setRecordingAction(action);
+    setRecordedKeys({});
+  };
+
+  const handleKeyRecord = (e) => {
+    if (!recordingAction) return;
+    e.preventDefault();
+
+    const newKeys = {
+      ctrl: e.ctrlKey || e.metaKey,
+      shift: e.shiftKey,
+      alt: e.altKey,
+      key: e.key === ' ' ? 'Space' : e.key,
+    };
+
+    // Remove empty properties
+    Object.keys(newKeys).forEach(k => !newKeys[k] && delete newKeys[k]);
+
+    setRecordedKeys(newKeys);
+  };
+
+  const handleSaveHotkey = () => {
+    if (!recordingAction || Object.keys(recordedKeys).length === 0) {
+      alert('Please record a hotkey');
+      return;
+    }
+
+    const updatedHotkeys = { ...hotkeys, [recordingAction]: recordedKeys };
+    setHotkeys(updatedHotkeys);
+    localStorage.setItem('canvasHotkeys', JSON.stringify(updatedHotkeys));
+    setRecordingAction(null);
+    setRecordedKeys({});
+  };
+
+  const handleResetHotkeys = () => {
+    const defaultHotkeys = {
+      undo: { ctrl: true, key: 'z' },
+      redo: { ctrl: true, key: 'y' },
+      copy: { ctrl: true, key: 'c' },
+      paste: { ctrl: true, key: 'v' },
+      delete: { key: 'Delete' },
+      bringForward: { ctrl: true, key: ']' },
+      sendBackward: { ctrl: true, key: '[' },
+    };
+    setHotkeys(defaultHotkeys);
+    localStorage.setItem('canvasHotkeys', JSON.stringify(defaultHotkeys));
+    setRecordingAction(null);
+    setRecordedKeys({});
+  };
+
+  const handleCanvasReady = useCallback((canvasInstance, actions) => {
     setCanvas(canvasInstance);
+    setCanvasActions(actions);
     
     // Initialize template-specific preloaded elements
     const initializer = getTemplateInitializer(templateId);
@@ -202,7 +288,7 @@ export default function EditorPage({ params }) {
       // Get canvas data as JSON
       const canvasData = canvas.toJSON();
       
-      // Create template object
+      // Create template object with sourceTemplateId for categorization
       const newTemplate = {
         id: `custom-${Date.now()}`,
         name: templateName,
@@ -211,6 +297,7 @@ export default function EditorPage({ params }) {
         description: `Custom template created from ${template.name}`,
         canvasData: canvasData,
         createdAt: new Date().toISOString(),
+        sourceTemplateId: templateId, // Store the original template category
       };
 
       // Save to localStorage
@@ -412,17 +499,17 @@ export default function EditorPage({ params }) {
               ← Back
             </a>
             <div className="border-l border-gray-300 h-6"></div>
-            <h1 className="text-xl font-semibold text-gray-900">
+            <h1 className="text-xl font-semibold text-black">
               {template.name}
             </h1>
-            <span className="text-sm text-gray-500 font-mono">
+            <span className="text-sm text-black font-mono">
               {template.width} × {template.height}
             </span>
             <div className="border-l border-gray-300 h-6"></div>
             
             {/* Logo Dropdown */}
             <div className="relative group">
-              <button className="text-gray-700 hover:text-gray-900 font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors">
+              <button className="text-black hover:text-black font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors">
                 Logo ▾
               </button>
               <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50">
@@ -449,22 +536,88 @@ export default function EditorPage({ params }) {
 
             {/* Audio Logo Menu */}
             <AudioLogoMenu handleAddAudioLogo={handleAddAudioLogo} />
+            
+            {/* Canvas Action Toolbar */}
+            <div className="border-l border-gray-300 h-6"></div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => canvasActions?.undo()}
+                title="Undo (Ctrl+Z)"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              >
+                <FaUndo className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => canvasActions?.redo()}
+                title="Redo (Ctrl+Y)"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              >
+                <FaRedo className="w-4 h-4" />
+              </button>
+              <div className="border-l border-gray-300 h-5 mx-1"></div>
+              <button
+                onClick={() => canvasActions?.copy()}
+                title="Copy (Ctrl+C)"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              >
+                <FaCopy className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => canvasActions?.paste()}
+                title="Paste (Ctrl+V)"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              >
+                <FaPaste className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedObject && canvas) {
+                    canvas.remove(selectedObject);
+                    canvas.discardActiveObject();
+                    canvas.renderAll();
+                  }
+                }}
+                title="Delete (Delete/Backspace)"
+                className="p-2 text-black hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+              >
+                <FaTrash className="w-4 h-4" />
+              </button>
+              <div className="border-l border-gray-300 h-5 mx-1"></div>
+              <button
+                onClick={() => canvasActions?.bringForward()}
+                title="Bring Forward (Ctrl+])"
+                className="p-2 text-black hover:text-black hover:bg-gray-100 rounded transition-colors"
+              >
+                <FaArrowUp className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => canvasActions?.sendBackward()}
+                title="Send Backward (Ctrl+[)"
+                className="p-2 text-black hover:text-black hover:bg-gray-100 rounded transition-colors"
+              >
+                <FaArrowDown className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="border-l border-gray-300 h-6"></div>
             <button
               onClick={() => setShowSaveModal(true)}
-              className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
+              className="text-black hover:text-black font-medium px-4 py-2 rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors"
             >
               Save as Template
             </button>
 
             {/* Load Template Dropdown */}
-            {savedTemplates.length > 0 && (
+            {savedTemplates.filter(t => t.sourceTemplateId === templateId).length > 0 && (
               <div className="relative group">
-                <button className="text-gray-700 hover:text-gray-900 font-medium px-4 py-2 rounded bg-green-50 hover:bg-green-100 border border-green-200 transition-colors">
+                <button className="text-black hover:text-black font-medium px-4 py-2 rounded bg-green-50 hover:bg-green-100 border border-green-200 transition-colors">
                   Load Template ▾
                 </button>
                 <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50">
                   <div className="p-2 max-h-64 overflow-y-auto">
-                    {savedTemplates.map((tmpl) => (
+                    {savedTemplates
+                      .filter(tmpl => tmpl.sourceTemplateId === templateId)
+                      .map((tmpl) => (
                       <button
                         key={tmpl.id}
                         onClick={() => {
@@ -487,43 +640,46 @@ export default function EditorPage({ params }) {
               </div>
             )}
           </div>
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            title="Settings"
+            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+          >
+            <FaCog className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Canvas Area */}
-        <div className="flex-1 flex items-center justify-center p-8 overflow-auto">
-          <CanvasEditor
-            template={template}
-            onCanvasReady={handleCanvasReady}
-            onSelectionChange={handleSelectionChange}
-          />
-        </div>
+<div className="flex-1 overflow-auto bg-gray-100">
+  <div className="min-h-full flex items-center justify-center p-8">
+    <CanvasEditor
+      template={template}
+      onCanvasReady={handleCanvasReady}
+      onSelectionChange={handleSelectionChange}
+      hotkeys={hotkeys}
+    />
+  </div>
+</div>
 
         {/* Right Sidebar */}
         <Sidebar
           canvas={canvas}
           selectedObject={selectedObject}
           template={template}
+          onClearCanvas={handleClearCanvas}
         />
       </div>
-
-      {/* Clear Button - Bottom Right */}
-      <button
-        onClick={handleClearCanvas}
-        className="fixed bottom-8 right-80 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg font-semibold transition-all hover:shadow-xl"
-      >
-        Clear
-      </button>
 
       {/* Save Template Modal */}
       {showSaveModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Save as Template</h2>
+            <h2 className="text-xl font-bold text-black mb-4">Save as Template</h2>
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-black mb-2">
                 Template Name
               </label>
               <input
@@ -542,7 +698,7 @@ export default function EditorPage({ params }) {
                   setShowSaveModal(false);
                   setTemplateName('');
                 }}
-                className="flex-1 px-4 py-2 text-gray-700 font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2 text-black font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
@@ -561,13 +717,13 @@ export default function EditorPage({ params }) {
       {showLoadModal && selectedLoadTemplate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Load Template</h2>
-            <p className="text-gray-700 mb-6">
+            <h2 className="text-xl font-bold text-black mb-4">Load Template</h2>
+            <p className="text-black mb-6">
               Loading this template will replace the current canvas. This action cannot be undone.
             </p>
             <div className="bg-gray-50 p-3 rounded-lg mb-6">
-              <div className="font-medium text-gray-900">{selectedLoadTemplate.name}</div>
-              <div className="text-sm text-gray-600">
+              <div className="font-medium text-black">{selectedLoadTemplate.name}</div>
+              <div className="text-sm text-black">
                 {selectedLoadTemplate.width} × {selectedLoadTemplate.height}
               </div>
               <div className="text-sm text-gray-500">
@@ -599,10 +755,10 @@ export default function EditorPage({ params }) {
       {showImageModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-[480px]">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Add Header Image</h2>
+            <h2 className="text-xl font-bold text-black mb-4">Add Header Image</h2>
             
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-black mb-2">
                 Upload from computer
               </label>
               <input
@@ -615,7 +771,7 @@ export default function EditorPage({ params }) {
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-black mb-2">
                 Or enter an image URL
               </label>
               <div className="flex gap-2">
@@ -643,9 +799,90 @@ export default function EditorPage({ params }) {
                   pendingPlaceholderRef.current = null;
                   setImageUrlInput('');
                 }}
-                className="px-4 py-2 text-gray-700 font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-black font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl max-h-[600px] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-black mb-6">Hotkey Settings</h2>
+            
+            <div className="space-y-4 mb-6">
+              {[
+                { action: 'undo', label: 'Undo' },
+                { action: 'redo', label: 'Redo' },
+                { action: 'copy', label: 'Copy' },
+                { action: 'paste', label: 'Paste' },
+                { action: 'delete', label: 'Delete' },
+                { action: 'bringForward', label: 'Bring Forward' },
+                { action: 'sendBackward', label: 'Send Backward' },
+              ].map(({ action, label }) => (
+                <div key={action} className="border border-gray-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="font-medium text-black">{label}</label>
+                    <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded text-black">
+                      {formatHotkey(hotkeys[action])}
+                    </span>
+                  </div>
+                  {recordingAction === action ? (
+                    <div className="space-y-2">
+                      <input
+                        autoFocus
+                        onKeyDown={handleKeyRecord}
+                        type="text"
+                        readOnly
+                        value={Object.keys(recordedKeys).length > 0 ? formatHotkey(recordedKeys) : 'Press any key...'}
+                        className="w-full px-3 py-2 border-2 border-blue-500 rounded bg-blue-50 text-center text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSaveHotkey}
+                          className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded transition-colors"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setRecordingAction(null);
+                            setRecordedKeys({});
+                          }}
+                          className="flex-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 text-sm font-medium rounded transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleStartRecording(action)}
+                      className="w-full px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleResetHotkeys}
+                className="flex-1 px-4 py-2 text-black font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm"
+              >
+                Reset to Default
+              </button>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors text-sm"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -43,3 +43,75 @@
     transform: translateY(0) scale(1);
   }
 }
+
+.fileInputWrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.hiddenFileInput {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  width: 0.1px;
+  height: 0.1px;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.fileInputLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: center;
+  border: none;
+}
+
+.fileInputLabel:hover {
+  background-color: #dbeafe;
+}
+
+/* Green variant for logo/image upload */
+.fileInputLabelGreen {
+  background-color: #f0fdf4;
+  color: #15803d;
+}
+
+.fileInputLabelGreen:hover {
+  background-color: #dcfce7;
+}
+
+.fileInputWrapper {
+  position: relative;
+  display: inline-flex;  /* Changed from block to inline-flex */
+  flex-shrink: 1;        /* Allow shrinking */
+  min-width: 0;          /* Allow flex to shrink below content size */
+}
+
+.fileInputLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.5rem;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: center;
+  border: none;
+  white-space: nowrap;   /* Prevent text wrapping */
+}
