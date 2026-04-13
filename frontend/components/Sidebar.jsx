@@ -5,7 +5,7 @@ import { Textbox, FabricImage } from 'fabric';
 import styles from './Sidebar.module.css';
 import autoAnimate from '@formkit/auto-animate';
 
-export default function Sidebar({ canvas, selectedObject, template, onClearCanvas }) {
+export default function Sidebar({ canvas, selectedObject, template, onClearCanvas, onImageUpload }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [textColor, setTextColor] = useState('#000000');
   const [fontSize, setFontSize] = useState(24);
@@ -17,6 +17,8 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
   const [hasBackgroundImage, setHasBackgroundImage] = useState(false);
   const [layers, setLayers] = useState([]);
   const [draggingIndex, setDraggingIndex] = useState(null);
+  const [showImageUrlModal, setShowImageUrlModal] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const layersListRef = useRef(null);
 
   useEffect(() => {
@@ -257,7 +259,8 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      FabricImage.fromURL(event.target.result).then((img) => {
+      const imageSource = event.target.result;
+      FabricImage.fromURL(imageSource).then((img) => {
         // Scale down if image is too large
         const maxWidth = canvas.width * 0.5;
         const maxHeight = canvas.height * 0.5;
@@ -277,9 +280,56 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
         canvas.add(img);
         canvas.setActiveObject(img);
         canvas.renderAll();
+
+        // Notify parent component about the uploaded image
+        if (onImageUpload) {
+          onImageUpload(imageSource);
+        }
       });
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleImageUrlUpload = (e) => {
+    const url = imageUrlInput.trim();
+    if (!url || !canvas) {
+      alert('Please enter a valid image URL');
+      return;
+    }
+
+    FabricImage.fromURL(url, { crossOrigin: 'anonymous' }).then((img) => {
+      // Scale down if image is too large
+      const maxWidth = canvas.width * 0.5;
+      const maxHeight = canvas.height * 0.5;
+      
+      if (img.width > maxWidth || img.height > maxHeight) {
+        const scale = Math.min(maxWidth / img.width, maxHeight / img.height);
+        img.scale(scale);
+      }
+
+      img.set({
+        left: canvas.width / 2,
+        top: canvas.height / 2,
+        originX: 'center',
+        originY: 'center'
+      });
+
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.renderAll();
+
+      // Notify parent component about the uploaded image
+      if (onImageUpload) {
+        onImageUpload(url);
+      }
+
+      // Clear the input and close modal
+      setImageUrlInput('');
+      setShowImageUrlModal(false);
+    }).catch((error) => {
+      console.error('Error loading image from URL:', error);
+      alert('Failed to load image from URL. Please check the URL and try again.');
+    });
   };
 
   // Layer controls
@@ -353,6 +403,46 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
                 className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg font-semibold transition-colors"
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image URL Modal */}
+      {showImageUrlModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowImageUrlModal(false)}>
+          <div className={styles.dialogBox} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Add Image from URL</h3>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
+              <input
+                type="text"
+                value={imageUrlInput}
+                onChange={(e) => setImageUrlInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleImageUrlUpload()}
+                placeholder="https://example.com/image.jpg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowImageUrlModal(false);
+                  setImageUrlInput('');
+                }}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImageUrlUpload}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg font-semibold transition-colors"
+              >
+                Add
               </button>
             </div>
           </div>
@@ -736,6 +826,12 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
                 Escolher Ficheiro
               </label>
             </div>
+            <button
+              onClick={() => setShowImageUrlModal(true)}
+              className="bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
+            >
+              URL
+            </button>
           </div>
           <p className="text-xs text-gray-500 mt-1">Max 200MB</p>
         </div>

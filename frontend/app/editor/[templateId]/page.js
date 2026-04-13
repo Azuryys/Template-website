@@ -114,6 +114,74 @@ function AudioLogoMenu({ handleAddAudioLogo }) {
   );
 }
 
+function ContentMenu({ recentImages, onSelectImage }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (recentImages.length === 0) {
+    return (
+      <div className="relative">
+        <button 
+          disabled
+          className="text-gray-400 font-medium px-3 py-1 rounded cursor-not-allowed"
+          title="No recent images in the past 7 days"
+        >
+          Content ▾
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <div className="relative group">
+        <button 
+          className="text-black hover:text-black font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors"
+          onMouseEnter={() => setIsOpen(true)}
+          onMouseLeave={() => setIsOpen(false)}
+        >
+          Content ▾
+        </button>
+
+        {isOpen && (
+          <div 
+            className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2"
+            onMouseEnter={() => setIsOpen(true)}
+            onMouseLeave={() => setIsOpen(false)}
+          >
+            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+              {recentImages.map((image) => (
+                <button
+                  key={image.id}
+                  onClick={() => {
+                    onSelectImage(image.src);
+                    setIsOpen(false);
+                  }}
+                  className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200 group/item"
+                  title={new Date(image.uploadedAt).toLocaleDateString()}
+                >
+                  <div className="w-full h-12 flex items-center justify-center bg-gray-50 rounded border border-gray-100 overflow-hidden">
+                    <img
+                      src={image.src}
+                      alt="Recent content"
+                      className="max-h-full max-w-full object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 text-center line-clamp-1">
+                    {new Date(image.uploadedAt).toLocaleDateString()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function EditorPage({ params }) {
   const { templateId } = use(params);
   const searchParams = useSearchParams();
@@ -155,9 +223,10 @@ export default function EditorPage({ params }) {
   });
   const [recordingAction, setRecordingAction] = useState(null);
   const [recordedKeys, setRecordedKeys] = useState({});
+  const [recentImages, setRecentImages] = useState([]);
   const pendingPlaceholderRef = useRef(null);
 
-  // Load saved templates and hotkeys from localStorage
+  // Load saved templates, hotkeys, and recent images from localStorage
   useEffect(() => {
     try {
       const templates = JSON.parse(localStorage.getItem('savedTemplates') || '[]');
@@ -167,6 +236,11 @@ export default function EditorPage({ params }) {
       if (Object.keys(savedHotkeys).length > 0) {
         setHotkeys(savedHotkeys);
       }
+
+      // Load recent images - keep last 20
+      const savedRecentImages = JSON.parse(localStorage.getItem('recentImages') || '[]');
+      const recentImages20 = savedRecentImages.slice(0, 20);
+      setRecentImages(recentImages20);
     } catch (error) {
       console.error('Error loading saved data:', error);
     }
@@ -345,23 +419,27 @@ export default function EditorPage({ params }) {
       canvas.clear();
       canvas.backgroundColor = '#ffffff';
       
-      // Load the saved template data
       canvas.loadFromJSON(selectedLoadTemplate.canvasData, () => {
-        // Ensure all objects are visible
-        canvas.forEachObject((obj) => {
-          obj.visible = true;
-        });
-        
-        // Force re-render and recalculate
-        canvas.calcOffset();
-        canvas.renderAll();
-        setSelectedObject(null);
-        
-        // Force another render after a tick to ensure visibility
-        setTimeout(() => {
-          canvas.renderAll();
-        }, 0);
+  canvas.forEachObject((obj) => {
+    obj.visible = true;
+
+    // ✅ Fix cursor misalignment for all text objects
+    if (obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') {
+      obj.set({
+        originX: 'left',
+        originY: 'top',
       });
+    }
+  });
+
+  canvas.calcOffset();
+  canvas.renderAll();
+  setSelectedObject(null);
+
+  setTimeout(() => {
+    canvas.renderAll();
+  }, 0);
+});
       
       // Show success message after a short delay
       setTimeout(() => {
@@ -380,6 +458,36 @@ export default function EditorPage({ params }) {
     }
     pendingPlaceholderRef.current = placeholder;
     setShowImageModal(true);
+  };
+
+  const saveRecentImage = (imageSource) => {
+    try {
+      const savedRecentImages = JSON.parse(localStorage.getItem('recentImages') || '[]');
+      
+      // Check if image already exists (to avoid duplicates)
+      const imageExists = savedRecentImages.some(
+        img => img.src === imageSource
+      );
+      
+      if (!imageExists) {
+        const newImage = {
+          src: imageSource,
+          uploadedAt: new Date().toISOString(),
+          id: Date.now(),
+        };
+        
+        savedRecentImages.unshift(newImage); // Add to beginning
+        // Keep only last 50 images total, but display only 20
+        const trimmedImages = savedRecentImages.slice(0, 50);
+        localStorage.setItem('recentImages', JSON.stringify(trimmedImages));
+        
+        // Update state with last 20 images
+        const recentImages20 = trimmedImages.slice(0, 20);
+        setRecentImages(recentImages20);
+      }
+    } catch (error) {
+      console.error('Error saving recent image:', error);
+    }
   };
 
   const handleImageFileSelect = (e) => {
@@ -439,6 +547,9 @@ export default function EditorPage({ params }) {
     canvas.renderAll();
     pendingPlaceholderRef.current = null;
     setShowImageModal(false);
+
+    // Save to recent images
+    saveRecentImage(imageSource);
   }).catch((error) => {
     console.error('Error loading image:', error);
     alert('Failed to load image. Please check the URL or try a different image.');
@@ -495,6 +606,35 @@ export default function EditorPage({ params }) {
     });
   };
 
+  const handleAddContentImage = (imageSource) => {
+    if (!canvas) return;
+    FabricImage.fromURL(imageSource, { crossOrigin: 'anonymous' }).then((img) => {
+      // Add image at center of canvas with reasonable size
+      const maxWidth = canvas.width * 0.5;
+      const maxHeight = canvas.height * 0.5;
+      
+      const scale = Math.min(
+        maxWidth / img.width,
+        maxHeight / img.height
+      );
+      
+      img.scale(scale);
+      img.set({
+        left: canvas.width / 2,
+        top: canvas.height / 2,
+        originX: 'center',
+        originY: 'center',
+      });
+      
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.renderAll();
+    }).catch((error) => {
+      console.error('Error loading image:', error);
+      alert('Failed to load image. Please try again.');
+    });
+  };
+
 
 
   return (
@@ -547,6 +687,12 @@ export default function EditorPage({ params }) {
 
             {/* Audio Logo Menu */}
             <AudioLogoMenu handleAddAudioLogo={handleAddAudioLogo} />
+            
+            {/* Content Menu */}
+            <ContentMenu 
+              recentImages={recentImages} 
+              onSelectImage={handleAddContentImage}
+            />
             
             {/* Canvas Action Toolbar */}
             <div className="border-l border-gray-300 h-6"></div>
@@ -675,6 +821,7 @@ export default function EditorPage({ params }) {
           selectedObject={selectedObject}
           template={template}
           onClearCanvas={handleClearCanvas}
+          onImageUpload={saveRecentImage}
         />
       </div>
 
