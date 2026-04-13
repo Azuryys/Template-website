@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { 
   FaUserPlus, 
@@ -10,10 +10,13 @@ import {
   FaCamera,
   FaLayerGroup,
   FaTimes,
-  FaSpinner
+  FaSpinner,
+  FaUsers,
+  FaBox,
+  FaImage
 } from "react-icons/fa";
 
-export default function Header({ isAdmin, handleLogout, userName = "User", userAvatar = null, onAvatarUpdate }) {
+export default function Header({ isAdmin, handleLogout, userName = "User", userAvatar = null, userRole = 'user', onAvatarUpdate }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -41,11 +44,26 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
     }
   }, [menuOpen]);
 
-  const getInitials = (name) => {
-    return name.split(" ").map((word) => word[0]).join("").toUpperCase().slice(0, 2);
-  };
+  const initials = useMemo(() => {
+    const safeName = String(userName || "User").trim();
+    return safeName
+      .split(" ")
+      .filter(Boolean)
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  }, [userName]);
 
-  const initials = getInitials(userName);
+  const normalizedRole = useMemo(
+    () => (userRole === 'superadmin' ? 'superadmin' : (isAdmin ? 'admin' : 'user')),
+    [userRole, isAdmin]
+  );
+
+  const roleLabel = useMemo(
+    () => (normalizedRole === 'superadmin' ? 'SuperAdmin' : (normalizedRole === 'admin' ? 'Administrador' : 'Utilizador')),
+    [normalizedRole]
+  );
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
@@ -70,7 +88,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
     setUploadError(null);
 
     try {
-      const res = await fetch(`http://localhost:5000/api/user/avatar`, {
+      const res = await fetch(`http://localhost:3001/api/user/avatar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
@@ -154,7 +172,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                 
                 <div className="hidden sm:block text-left">
                   <p className="text-sm font-medium text-gray-900">{userName}</p>
-                  <p className="text-xs text-gray-500">{isAdmin ? "Administrador" : "Utilizador"}</p>
+                  <p className="text-xs text-gray-500">{roleLabel}</p>
                 </div>
 
                 <FaChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`} />
@@ -183,7 +201,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                       </div>
                       <div className="min-w-0">
                         <h3 className="text-sm font-semibold text-gray-900 truncate">{userName}</h3>
-                        <p className="text-xs text-gray-500">{isAdmin ? "Administrador" : "Utilizador"}</p>
+                        <p className="text-xs text-gray-500">{roleLabel}</p>
                       </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-2">Clique na foto para alterar</p>
@@ -192,9 +210,22 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                   <div className="p-2">
                     {isAdmin && (
                       <>
+                        <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                          <FaUsers className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-medium">Ver Utilizadores</span>
+                        </Link>
+                        <Link href="/templates" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                          <FaBox className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-medium">Criar Templates</span>
+                        </Link>
+                        <Link href="/logos" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                          <FaImage className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-medium">Adicionar Logos</span>
+                        </Link>
+                        <div className="h-px bg-gray-100 my-1 mx-2" />
                         <Link href="/Register" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
                           <FaUserPlus className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium">Criar Usuário</span>
+                          <span className="text-sm font-medium">Criar Utilizador</span>
                         </Link>
                         <Link href="/admin" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
                           <FaShieldAlt className="w-4 h-4 text-gray-500" />

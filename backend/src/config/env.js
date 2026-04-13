@@ -5,10 +5,12 @@
  * ACESSO: São importadas em db.js e auth.js
  */
 
-import dotenv from "dotenv"
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 
-
-dotenv.config();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../../.env') });
 
 export const ENV =  {
     // ========== SERVIDOR ==========
