@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "test-backend-login",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"test-login.js"
+			],
+			"isBackground": false,
+			"group": "test"
+		}
+	]
+}

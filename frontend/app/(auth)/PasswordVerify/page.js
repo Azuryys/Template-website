@@ -11,10 +11,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function PasswordVerifyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <PasswordVerifyContent />
+    </Suspense>
+  );
+}
+
+function PasswordVerifyContent() {
   // Código de 6 dígitos digitado pelo usuário
   const [code, setCode] = useState('');
   
@@ -41,7 +49,7 @@ export default function PasswordVerifyPage() {
   /**
    * handleSubmit - Verifica se o código é válido
    * 
-   * POST /api/auth/verify-code
+  * POST /api/password/verify-code
    * Body: { email: string, code: string }
    * 
    * Sucesso: Retorna codeId e redireciona para PasswordReset
@@ -52,13 +60,18 @@ export default function PasswordVerifyPage() {
     setStatus('loading');
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/verify-code', {
+      const response = await fetch('http://localhost:3001/api/password/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
       });
 
-      const data = await response.json();
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
 
       if (response.ok) {
         // Redireciona para reset com email e codeId

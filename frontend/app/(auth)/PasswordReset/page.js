@@ -1,10 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function PasswordResetPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <PasswordResetContent />
+    </Suspense>
+  );
+}
+
+function PasswordResetContent() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState('idle');
@@ -36,13 +44,18 @@ export default function PasswordResetPage() {
     setStatus('loading');
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/reset-password', {
+      const response = await fetch('http://localhost:3001/api/password/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, codeId, newPassword }),
       });
 
-      const data = await response.json();
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
 
       if (response.ok) {
         setStatus('success');

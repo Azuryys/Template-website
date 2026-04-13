@@ -1,4 +1,4 @@
-import { pool } from '../src/server/lib/db.js';
+import { auth } from '../auth.js';
 
 /**
  * SCRIPT: seed-users.js
@@ -12,26 +12,36 @@ async function seedUsers() {
   try {
     // Lista de utilizadores de teste para inserir
     const testUsers = [
-      'admin@gmail.com',
-      'kunarata32@gmail.com',
-      'test@gmail.com'
+      { email: 'admin@example.com', name: 'Admin', password: 'Admin123456!' },
+      { email: 'user1@example.com', name: 'User One', password: 'User123456!' },
+      { email: 'user2@example.com', name: 'User Two', password: 'User123456!' },
     ];
 
     console.log('🌱 Iniciando seed de utilizadores...\n');
 
-    for (const email of testUsers) {
-      await pool.query(
-        'INSERT INTO "user" (email) VALUES ($1) ON CONFLICT (email) DO NOTHING',
-        [email]
-      );
-      console.log(`✅ ${email}`);
+    for (const user of testUsers) {
+      try {
+        await auth.api.signUpEmail({
+          body: {
+            email: user.email,
+            password: user.password,
+            name: user.name,
+          },
+        });
+        console.log(`✅ ${user.email}`);
+      } catch (error) {
+        const message = error?.message || '';
+        if (message.toLowerCase().includes('already exists')) {
+          console.log(`ℹ️ ${user.email} já existe`);
+        } else {
+          console.log(`❌ ${user.email}: ${message}`);
+        }
+      }
     }
 
     console.log('\n✨ Seed de utilizadores completado!');
   } catch (error) {
     console.error('❌ Erro ao inserir utilizadores:', error.message);
-  } finally {
-    pool.end();
   }
 }
 

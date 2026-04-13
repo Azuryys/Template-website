@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getAllTemplates } from '@/lib/templates';
 import Header from '@/components/Header';
+import { authClient } from '@/lib/auth-client';
 
 const PRESETS = [
   { label: '1920 × 1080 (Full HD)', width: 1920, height: 1080 },
@@ -18,27 +19,37 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loadingSession, setLoadingSession] = useState(true);
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customWidth, setCustomWidth] = useState('');
   const [customHeight, setCustomHeight] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    // Recuperar usuário do localStorage
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      router.push('/Login');
-      return;
-    }
-    const parsedUser = JSON.parse(storedUser);
-    setUser(parsedUser);
-    setIsAdmin(parsedUser.isAdmin === true);
-    setTemplates(getAllTemplates());
+    const loadSession = async () => {
+      try {
+        const { data: session } = await authClient.getSession();
+        if (!session?.user) {
+          router.push('/Login');
+          return;
+        }
+
+        setUser(session.user);
+        const role = session.user?.role || session.user?.usertype;
+        setIsAdmin(role === 'admin' || role === 'superadmin');
+        setTemplates(getAllTemplates());
+      } catch (error) {
+        router.push('/Login');
+      } finally {
+        setLoadingSession(false);
+      }
+    };
+
+    loadSession();
   }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('userPassword');
+  const handleLogout = async () => {
+    await authClient.signOut();
     router.push('/Login');
   };
 
@@ -50,14 +61,14 @@ export default function Dashboard() {
     router.push(`/editor/custom?width=${w}&height=${h}`);
   };
 
-  if (!user) {
+  if (loadingSession || !user) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Header */}
-      <Header isAdmin={isAdmin} handleLogout={handleLogout} />
+      <Header isAdmin={isAdmin} handleLogout={handleLogout} userName={user?.name || user?.email || 'User'} userAvatar={user?.image || null} userRole={user?.role || user?.usertype || 'user'} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">

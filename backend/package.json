@@ -8,7 +8,8 @@
     "dev": "nodemon src/server/server.js",
     "migrate": "node scripts/create-tables.js",
     "seed": "node scripts/seed-users.js",
-    "check-db": "node scripts/check-tables.js"
+    "check-db": "node scripts/check-tables.js",
+    "create-superadmin": "node scripts/create-superadmin.js"
   },
   "dependencies": {
     "cors": "^2.8.6",

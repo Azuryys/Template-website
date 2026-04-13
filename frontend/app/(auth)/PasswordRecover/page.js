@@ -28,7 +28,7 @@ export default function PasswordRecoverPage() {
   /**
    * handleSubmit - Envia email para o backend gerar código de recuperação
    * 
-   * POST /api/auth/recover
+  * POST /api/password/recover
    * Body: { email: string }
    * 
    * Sucesso: Redireciona para PasswordVerify
@@ -39,13 +39,18 @@ export default function PasswordRecoverPage() {
     setStatus('loading');
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/recover', {
+      const response = await fetch('http://localhost:3001/api/password/recover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
 
-      const data = await response.json();
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
 
       if (response.ok) {
         // Redireciona para página de verificação com email na URL

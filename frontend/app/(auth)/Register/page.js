@@ -1,48 +1,49 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { adminRegisterUser, isUserAdmin } from '@/lib/auth';
+import { authClient } from '@/lib/auth-client';
 
 export default function RegisterPage() {
-  const [user, setUser] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'user',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingSession, setLoadingSession] = useState(true);
+  const [currentRole, setCurrentRole] = useState('user');
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is logged in and is admin
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
-      setError('Você precisa estar logado como administrador para acessar esta página');
-      return;
-    }
+    const loadSession = async () => {
+      try {
+        const { data: session } = await authClient.getSession();
+        const role = session?.user?.role || session?.user?.usertype || 'user';
+        setCurrentRole(role);
+      } catch {
+        setCurrentRole('user');
+      } finally {
+        setLoadingSession(false);
+      }
+    };
 
-    const currentUser = JSON.parse(storedUser);
-    setUser(currentUser);
-
-    if (!isUserAdmin(currentUser)) {
-      setError('Apenas administradores podem criar novos usuários');
-      return;
-    }
-
-    setIsAdmin(true);
-    setError('');
+    loadSession();
   }, []);
 
+  const canCreateAdmin = currentRole === 'admin' || currentRole === 'superadmin';
+  const canCreateSuperAdmin = currentRole === 'superadmin';
+
   const handleChange = (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: value
     });
   };
 
@@ -50,11 +51,6 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     setSuccess('');
-
-    if (!user) {
-      setError('Usuário não autenticado');
-      return;
-    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('As senhas não coincidem');
@@ -69,100 +65,73 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const userPassword = localStorage.getItem('userPassword');
-      if (!userPassword) {
-        setError('Erro de autenticação. Faça login novamente.');
-        setLoading(false);
-        return;
+      const selectedRole = canCreateSuperAdmin
+        ? formData.role
+        : canCreateAdmin
+          ? (formData.role === 'admin' ? 'admin' : 'user')
+          : 'user';
+
+      let authError = null;
+
+      if (selectedRole === 'user' && !canCreateAdmin) {
+        const { error: signUpError } = await authClient.signUp.email({
+          email: formData.email,
+          password: formData.password,
+          name: formData.name,
+          callbackURL: '/Login'
+        });
+        authError = signUpError;
+      } else {
+        const response = await fetch('http://localhost:3001/api/admin/create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            name: formData.name,
+            role: selectedRole,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          authError = { message: data?.error || 'Erro ao criar usuário' };
+        }
       }
 
-      const result = adminRegisterUser(
-        user.email,
-        userPassword,
-        formData.name,
-        formData.email,
-        formData.password
-      );
-
-      if (result.error) {
-        setError(result.error);
+      if (authError) {
+        setError(authError.message || 'Erro ao criar usuário');
       } else {
         setSuccess(`Usuário ${formData.name} criado com sucesso!`);
         setFormData({
           name: '',
           email: '',
           password: '',
-          confirmPassword: ''
+          confirmPassword: '',
+          role: 'user',
         });
-        setTimeout(() => {
-          setSuccess('');
-        }, 3000);
+        setTimeout(() => setSuccess(''), 3000);
+        setTimeout(() => router.push('/Login'), 1800);
       }
-    } catch (err) {
+    } catch {
       setError('Falha ao criar usuário. Tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
-  // If not admin, show access denied
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md text-center">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-8">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Acesso Negado</h1>
-            <p className="text-gray-700 mb-6">
-              {error || 'Você não tem permissão para acessar esta página.'}
-            </p>
-            <div className="space-y-3">
-              <Link
-                href="/Login"
-                className="block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
-              >
-                Voltar ao Login
-              </Link>
-              <Link
-                href="/dashboard"
-                className="block bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition"
-              >
-                Ir para Dashboard
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Criar Novo Usuário
-          </h1>
-         {/* <p className="text-gray-600 text-base">
-            Apenas administradores podem criar novos usuários
-          </p>*/}
-          <p className="text-sm text-blue-600 mt-2">
-            Logado como: 
-          </p>
-          <p className='text-sm text-blue-600 mt-2'>
-            <strong>{user?.name}</strong>
-          </p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Criar Novo Usuário</h1>
         </div>
 
-        {/* Form Card */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name Field */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Nome Completo
-              </label>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
               <input
                 id="name"
                 type="text"
@@ -170,19 +139,12 @@ export default function RegisterPage() {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="
-                       w-full px-4 py-3 border border-gray-300 rounded-lg 
-                       text-black placeholder-gray-400
-                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                       outline-none transition bg-white"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               />
             </div>
 
-            {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                E-mail
-              </label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">E-mail</label>
               <input
                 id="email"
                 type="email"
@@ -190,19 +152,12 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="
-                       w-full px-4 py-3 border border-gray-300 rounded-lg 
-                       text-black placeholder-gray-400
-                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                       outline-none transition bg-white"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               />
             </div>
 
-            {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Senha
-              </label>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
               <input
                 id="password"
                 type="password"
@@ -210,20 +165,13 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="
-                       w-full px-4 py-3 border border-gray-300 rounded-lg 
-                       text-black placeholder-gray-400
-                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                       outline-none transition bg-white"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               />
               <p className="text-xs text-gray-500 mt-1">Mínimo 6 caracteres</p>
             </div>
 
-            {/* Confirm Password Field */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirmar Senha
-              </label>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">Confirmar Senha</label>
               <input
                 id="confirmPassword"
                 type="password"
@@ -231,64 +179,54 @@ export default function RegisterPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className="
-                       w-full px-4 py-3 border border-gray-300 rounded-lg 
-                       text-black placeholder-gray-400
-                       focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                       outline-none transition bg-white"
-              />
-            </div>
-             {/* Admin or not */}
-            <div>
-              <label htmlFor="isAdmin" className="block text-sm font-medium text-gray-700 mb-2">
-                É Administrador?
-              </label>
-              <input
-                id="isAdmin"
-                type="checkbox"
-                name="isAdmin"
-                checked={formData.isAdmin}
-                onChange={handleChange}
-                className="w-5 h-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               />
             </div>
 
-            {/* Error Message */}
+            {(canCreateAdmin || canCreateSuperAdmin) && (
+              <div>
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">Perfil da Conta</label>
+                <select
+                  id="role"
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-black focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  {canCreateSuperAdmin && <option value="superadmin">Super Admin</option>}
+                </select>
+                {!canCreateSuperAdmin && (
+                  <p className="text-xs text-gray-500 mt-1">Apenas superadmin pode criar super admin.</p>
+                )}
+              </div>
+            )}
+
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
             )}
 
-            {/* Success Message */}
             {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                {success}
-              </div>
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">{success}</div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 ease-in-out transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-4 rounded-lg transition"
             >
-              {loading ? 'Criando usuário...' : 'Criar Usuário'}
+              {loading ? 'Criando...' : 'Criar Usuário'}
             </button>
           </form>
 
-          {/* Links */}
-          <div className="mt-6 space-y-3 text-center text-sm">
-            <Link
-              href="/dashboard"
-              className="block text-blue-600 hover:text-blue-700 font-semibold"
-            >
+          <div className="mt-6 text-center">
+            <Link href="/dashboard" className="text-blue-600 hover:text-blue-700 font-semibold text-sm">
               Voltar ao Dashboard
             </Link>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="mt-8 text-center text-xs text-gray-500">
           <p>© 2026 Banner Creator. Todos os direitos reservados.</p>
         </div>
