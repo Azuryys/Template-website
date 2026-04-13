@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Textbox, FabricImage } from 'fabric';
 import styles from './Sidebar.module.css';
 
@@ -14,6 +14,21 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
   const [tempSelectedFont, setTempSelectedFont] = useState('BauerMediaSans-Regular');
   const [showColorCombos, setShowColorCombos] = useState(false);
   const [hasBackgroundImage, setHasBackgroundImage] = useState(false);
+
+  useEffect(() => {
+    if (!canvas) return;
+
+    const updateBgImageState = () => {
+      setHasBackgroundImage(!!canvas.backgroundImage);
+    };
+
+    updateBgImageState();
+    canvas.on('after:render', updateBgImageState);
+
+    return () => {
+      canvas.off('after:render', updateBgImageState);
+    };
+  }, [canvas]);
 
   const colorCombos = [
     { label: 'Lavender and Mint',            colors: [{ name: 'Lavender',       hex: '#a096ff' }, { name: 'Mint',         hex: '#1fd1bd' }] },

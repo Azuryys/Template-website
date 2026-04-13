@@ -196,15 +196,26 @@ export default function EditorPage({ params }) {
     if (!recordingAction) return;
     e.preventDefault();
 
+    const modifierKeys = ['Control', 'Shift', 'Alt', 'Meta'];
+    let keyChar = e.key === ' ' ? 'Space' : e.key;
+
+    if (modifierKeys.includes(keyChar)) {
+      keyChar = undefined;
+    }
+
     const newKeys = {
       ctrl: e.ctrlKey || e.metaKey,
       shift: e.shiftKey,
       alt: e.altKey,
-      key: e.key === ' ' ? 'Space' : e.key,
+      key: keyChar,
     };
 
     // Remove empty properties
     Object.keys(newKeys).forEach(k => !newKeys[k] && delete newKeys[k]);
+
+    if (!newKeys.key) {
+      return;
+    }
 
     setRecordedKeys(newKeys);
   };
@@ -324,7 +335,7 @@ export default function EditorPage({ params }) {
     }
 
     try {
-      const templateName = selectedLoadTemplate.name;
+      const loadTemplateName = selectedLoadTemplate.name;
       
       // Close modal and reset state first
       setShowLoadModal(false);
@@ -354,7 +365,7 @@ export default function EditorPage({ params }) {
       
       // Show success message after a short delay
       setTimeout(() => {
-        alert(`Template "${templateName}" loaded successfully!`);
+        alert(`Template "${loadTemplateName}" loaded successfully!`);
       }, 300);
     } catch (error) {
       console.error('Error loading template:', error);
@@ -570,13 +581,7 @@ export default function EditorPage({ params }) {
                 <FaPaste className="w-4 h-4" />
               </button>
               <button
-                onClick={() => {
-                  if (selectedObject && canvas) {
-                    canvas.remove(selectedObject);
-                    canvas.discardActiveObject();
-                    canvas.renderAll();
-                  }
-                }}
+                onClick={() => canvasActions?.delete()}
                 title="Delete (Delete/Backspace)"
                 className="p-2 text-black hover:text-red-600 hover:bg-red-50 rounded transition-colors"
               >

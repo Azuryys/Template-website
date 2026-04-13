@@ -35,37 +35,43 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
 
   // Undo action
   const performUndo = useCallback(async () => {
+    if (isUndoRedoRef.current) return;
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas || historyStepRef.current <= 0) return;
 
     isUndoRedoRef.current = true;
-    historyStepRef.current--;
-    const state = historyRef.current[historyStepRef.current];
+    try {
+      historyStepRef.current--;
+      const state = historyRef.current[historyStepRef.current];
 
-    await fabricCanvas.loadFromJSON(state);
-    fabricCanvas.renderAll();
+      await fabricCanvas.loadFromJSON(state);
+      fabricCanvas.renderAll();
 
-    // Restore selection callback after load
-    onSelectionChangeRef.current?.(fabricCanvas.getActiveObject());
-
-    isUndoRedoRef.current = false;
+      // Restore selection callback after load
+      onSelectionChangeRef.current?.(fabricCanvas.getActiveObject());
+    } finally {
+      isUndoRedoRef.current = false;
+    }
   }, []);
 
   // Redo action
   const performRedo = useCallback(async () => {
+    if (isUndoRedoRef.current) return;
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas || historyStepRef.current >= historyRef.current.length - 1) return;
 
     isUndoRedoRef.current = true;
-    historyStepRef.current++;
-    const state = historyRef.current[historyStepRef.current];
+    try {
+      historyStepRef.current++;
+      const state = historyRef.current[historyStepRef.current];
 
-    await fabricCanvas.loadFromJSON(state);
-    fabricCanvas.renderAll();
+      await fabricCanvas.loadFromJSON(state);
+      fabricCanvas.renderAll();
 
-    onSelectionChangeRef.current?.(fabricCanvas.getActiveObject());
-
-    isUndoRedoRef.current = false;
+      onSelectionChangeRef.current?.(fabricCanvas.getActiveObject());
+    } finally {
+      isUndoRedoRef.current = false;
+    }
   }, []);
 
   // Copy selected object
@@ -123,6 +129,20 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     const activeObject = fabricCanvas.getActiveObject();
     if (activeObject) {
       fabricCanvas.sendObjectBackwards(activeObject);
+      fabricCanvas.renderAll();
+      saveState();
+    }
+  }, [saveState]);
+
+  // Delete action
+  const performDelete = useCallback(() => {
+    const fabricCanvas = canvasRef.current;
+    if (!fabricCanvas) return;
+
+    const activeObject = fabricCanvas.getActiveObject();
+    if (activeObject) {
+      fabricCanvas.remove(activeObject);
+      fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
       saveState();
     }
@@ -232,13 +252,9 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
       }
 
       if (matchesHotkey(currentHotkeys.delete)) {
-        const activeObject = fabricCanvas.getActiveObject();
-        if (activeObject) {
-          fabricCanvas.remove(activeObject);
-          fabricCanvas.discardActiveObject();
-          fabricCanvas.renderAll();
-          saveState();
-        }
+        e.preventDefault();
+        performDelete();
+        return;
       }
 
       if (matchesHotkey(currentHotkeys.bringForward)) {
@@ -263,7 +279,7 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
       canvasRef.current = null;
       setCanvas(null);
     };
-  }, [canvasId, template, saveState, performUndo, performRedo, performCopy, performPaste, performBringForward, performSendBackward]);
+  }, [canvasId, template, saveState, performUndo, performRedo, performCopy, performPaste, performDelete, performBringForward, performSendBackward]);
 
   return {
     canvas,
@@ -271,6 +287,7 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     redo: performRedo,
     copy: performCopy,
     paste: performPaste,
+    delete: performDelete,
     bringForward: performBringForward,
     sendBackward: performSendBackward,
   };
