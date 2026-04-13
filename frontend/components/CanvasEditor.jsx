@@ -7,13 +7,13 @@ export default function CanvasEditor({ template, onCanvasReady, onSelectionChang
   const canvasContainerRef = useRef(null);
   const canvasId = 'editor-canvas';
   
-  const { canvas, undo, redo, copy, paste, bringForward, sendBackward } = useCanvasEditor(canvasId, template, onSelectionChange, hotkeys);
+  const { canvas, undo, redo, copy, paste, delete: performDelete, bringForward, sendBackward } = useCanvasEditor(canvasId, template, onSelectionChange, hotkeys);
 
   useEffect(() => {
     if (canvas && onCanvasReady) {
-      onCanvasReady(canvas, { undo, redo, copy, paste, bringForward, sendBackward });
+      onCanvasReady(canvas, { undo, redo, copy, paste, delete: performDelete, bringForward, sendBackward });
     }
-  }, [canvas, undo, redo, copy, paste, bringForward, sendBackward, onCanvasReady]);
+  }, [canvas, undo, redo, copy, paste, performDelete, bringForward, sendBackward, onCanvasReady]);
 
   return (
     <div

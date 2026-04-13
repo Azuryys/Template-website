@@ -99,6 +99,39 @@
   min-width: 0;          /* Allow flex to shrink below content size */
 }
 
+/* Layer items animation */
+.layerItem {
+  animation: slideInLayer 0.3s ease-out forwards;
+  transform-origin: top;
+}
+
+@keyframes slideInLayer {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Layers list container */
+.layersListContainer {
+  scrollbar-gutter: stable;
+}
+
+/* Hide scrollbar during drag */
+.layersListNoDragScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.layersListNoDragScroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
 .fileInputLabel {
   display: inline-flex;
   align-items: center;

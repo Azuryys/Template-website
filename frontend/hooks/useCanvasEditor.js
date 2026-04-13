@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Canvas } from 'fabric';
+import { Canvas, ActiveSelection } from 'fabric';
 
 export default function useCanvasEditor(canvasId, template, onSelectionChange, hotkeys = null) {
   const [canvas, setCanvas] = useState(null);
@@ -19,21 +19,16 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     hotkeysRef.current = hotkeys;
   }, [hotkeys]);
 
-  // Save state to history - use useCallback to maintain stable reference
   const saveState = useCallback(() => {
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas || isUndoRedoRef.current) return;
 
-    // Use toJSON() instead of JSON.stringify for proper serialization
     const json = fabricCanvas.toJSON();
-
-    // Remove any states after current step (if user made changes after undo)
     historyRef.current = historyRef.current.slice(0, historyStepRef.current + 1);
     historyRef.current.push(json);
     historyStepRef.current = historyRef.current.length - 1;
   }, []);
 
-  // Undo action
   const performUndo = useCallback(async () => {
     if (isUndoRedoRef.current) return;
     const fabricCanvas = canvasRef.current;
@@ -43,18 +38,14 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     try {
       historyStepRef.current--;
       const state = historyRef.current[historyStepRef.current];
-
       await fabricCanvas.loadFromJSON(state);
       fabricCanvas.renderAll();
-
-      // Restore selection callback after load
       onSelectionChangeRef.current?.(fabricCanvas.getActiveObject());
     } finally {
       isUndoRedoRef.current = false;
     }
   }, []);
 
-  // Redo action
   const performRedo = useCallback(async () => {
     if (isUndoRedoRef.current) return;
     const fabricCanvas = canvasRef.current;
@@ -64,84 +55,120 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     try {
       historyStepRef.current++;
       const state = historyRef.current[historyStepRef.current];
-
       await fabricCanvas.loadFromJSON(state);
       fabricCanvas.renderAll();
-
       onSelectionChangeRef.current?.(fabricCanvas.getActiveObject());
     } finally {
       isUndoRedoRef.current = false;
     }
   }, []);
 
-  // Copy selected object
+  // ✅ Updated performCopy — uses getBoundingRect() for true position
   const performCopy = useCallback(async () => {
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas) return;
 
-    const activeObject = fabricCanvas.getActiveObject();
-    if (activeObject) {
-      const cloned = await activeObject.clone();
-      clipboardRef.current = cloned;
+    const selectedObjects = fabricCanvas.getActiveObjects();
+    if (selectedObjects.length > 0) {
+      clipboardRef.current = {
+        objects: selectedObjects.map((obj) => {
+          const bounds = obj.getBoundingRect();
+          return {
+            object: obj,
+            originalLeft: bounds.left,
+            originalTop: bounds.top,
+          };
+        }),
+        pasteCount: 0,
+      };
     }
   }, []);
 
-  // Paste clipped object
+  // ✅ Updated performPaste — clamps to canvas bounds and forces top-left origin
   const performPaste = useCallback(async () => {
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas || !clipboardRef.current) return;
 
-    const clonedObj = await clipboardRef.current.clone();
     fabricCanvas.discardActiveObject();
 
-    // Slightly offset the pasted object
-    clonedObj.set({
-      left: (clonedObj.left || 0) + 10,
-      top: (clonedObj.top || 0) + 10,
-      evented: true
-    });
+    const { objects } = clipboardRef.current;
+    clipboardRef.current.pasteCount += 1;
 
-    fabricCanvas.add(clonedObj);
-    fabricCanvas.setActiveObject(clonedObj);
+    const STEP = 20;
+    const offset = STEP * clipboardRef.current.pasteCount;
+
+    const pastedObjects = [];
+
+    for (const item of objects) {
+      const clonedObj = await item.object.clone();
+
+      const objWidth = clonedObj.getScaledWidth();
+      const objHeight = clonedObj.getScaledHeight();
+
+      const newLeft = Math.max(0, Math.min(
+        item.originalLeft + offset,
+        fabricCanvas.width - objWidth
+      ));
+      const newTop = Math.max(0, Math.min(
+        item.originalTop + offset,
+        fabricCanvas.height - objHeight
+      ));
+
+      clonedObj.set({
+        left: newLeft,
+        top: newTop,
+        originX: 'left',
+        originY: 'top',
+        evented: true,
+      });
+
+      fabricCanvas.add(clonedObj);
+      pastedObjects.push(clonedObj);
+    }
+
+    if (pastedObjects.length > 1) {
+      const selection = new ActiveSelection(pastedObjects, { canvas: fabricCanvas });
+      fabricCanvas.setActiveObject(selection);
+    } else if (pastedObjects.length === 1) {
+      fabricCanvas.setActiveObject(pastedObjects[0]);
+    }
+
     fabricCanvas.renderAll();
     saveState();
-    onSelectionChangeRef.current?.(clonedObj);
+    onSelectionChangeRef.current?.(fabricCanvas.getActiveObject());
   }, [saveState]);
 
-  // Bring object forward in layer
   const performBringForward = useCallback(() => {
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas) return;
 
-    const activeObject = fabricCanvas.getActiveObject();
-    if (activeObject) {
-      fabricCanvas.bringObjectForward(activeObject);
+    const selectedObjects = fabricCanvas.getActiveObjects();
+    if (selectedObjects.length > 0) {
+      selectedObjects.forEach(obj => fabricCanvas.bringObjectForward(obj));
       fabricCanvas.renderAll();
       saveState();
     }
   }, [saveState]);
 
-  // Send object backward in layer
   const performSendBackward = useCallback(() => {
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas) return;
 
-    const activeObject = fabricCanvas.getActiveObject();
-    if (activeObject) {
-      fabricCanvas.sendObjectBackwards(activeObject);
+    const selectedObjects = fabricCanvas.getActiveObjects();
+    if (selectedObjects.length > 0) {
+      selectedObjects.forEach(obj => fabricCanvas.sendObjectBackwards(obj));
       fabricCanvas.renderAll();
       saveState();
     }
   }, [saveState]);
 
-  // Delete action
   const performDelete = useCallback(() => {
     const fabricCanvas = canvasRef.current;
     if (!fabricCanvas) return;
 
-    const activeObject = fabricCanvas.getActiveObject();
-    if (activeObject) {
-      fabricCanvas.remove(activeObject);
+    const selectedObjects = fabricCanvas.getActiveObjects();
+    if (selectedObjects.length > 0) {
+      selectedObjects.forEach(obj => fabricCanvas.remove(obj));
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
       saveState();
@@ -151,7 +178,6 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
   useEffect(() => {
     if (!template) return;
 
-    // Initialize Fabric.js canvas
     const fabricCanvas = new Canvas(canvasId, {
       width: template.width,
       height: template.height,
@@ -161,12 +187,10 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     setCanvas(fabricCanvas);
     canvasRef.current = fabricCanvas;
 
-    // Initialize history with empty canvas state
     const initialState = fabricCanvas.toJSON();
     historyRef.current = [initialState];
     historyStepRef.current = 0;
 
-    // Selection event handlers
     fabricCanvas.on('selection:created', (e) => {
       onSelectionChangeRef.current?.(e.selected[0]);
     });
@@ -179,12 +203,10 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
       onSelectionChangeRef.current?.(null);
     });
 
-    // Save state on object modifications (but not during undo/redo)
     fabricCanvas.on('object:added', saveState);
     fabricCanvas.on('object:modified', saveState);
     fabricCanvas.on('object:removed', saveState);
 
-    // Hotkey handler
     const handleKeyDown = (e) => {
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) {
@@ -199,20 +221,13 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
         key: e.key === ' ' ? 'Space' : e.key,
       };
 
-      // Helper function to check if pressed keys match a hotkey config
       const matchesHotkey = (hotkeyConfig) => {
         if (!hotkeyConfig) return false;
-        
-        // Normalize the key for comparison
         const configKey = hotkeyConfig.key?.toLowerCase?.() || hotkeyConfig.key;
         const pressedKey = pressedKeys.key?.toLowerCase?.() || pressedKeys.key;
-
-        // Check if all required modifiers match
         if ((hotkeyConfig.ctrl || false) !== (pressedKeys.ctrl || false)) return false;
         if ((hotkeyConfig.shift || false) !== (pressedKeys.shift || false)) return false;
         if ((hotkeyConfig.alt || false) !== (pressedKeys.alt || false)) return false;
-
-        // Check if the key matches
         return configKey === pressedKey;
       };
 
@@ -226,53 +241,17 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
         sendBackward: { ctrl: true, key: '[' },
       };
 
-      // Check all hotkey actions
-      if (matchesHotkey(currentHotkeys.undo)) {
-        e.preventDefault();
-        performUndo();
-        return;
-      }
-
-      if (matchesHotkey(currentHotkeys.redo)) {
-        e.preventDefault();
-        performRedo();
-        return;
-      }
-
-      if (matchesHotkey(currentHotkeys.copy)) {
-        e.preventDefault();
-        performCopy();
-        return;
-      }
-
-      if (matchesHotkey(currentHotkeys.paste)) {
-        e.preventDefault();
-        performPaste();
-        return;
-      }
-
-      if (matchesHotkey(currentHotkeys.delete)) {
-        e.preventDefault();
-        performDelete();
-        return;
-      }
-
-      if (matchesHotkey(currentHotkeys.bringForward)) {
-        e.preventDefault();
-        performBringForward();
-        return;
-      }
-
-      if (matchesHotkey(currentHotkeys.sendBackward)) {
-        e.preventDefault();
-        performSendBackward();
-        return;
-      }
+      if (matchesHotkey(currentHotkeys.undo)) { e.preventDefault(); performUndo(); return; }
+      if (matchesHotkey(currentHotkeys.redo)) { e.preventDefault(); performRedo(); return; }
+      if (matchesHotkey(currentHotkeys.copy)) { e.preventDefault(); performCopy(); return; }
+      if (matchesHotkey(currentHotkeys.paste)) { e.preventDefault(); performPaste(); return; }
+      if (matchesHotkey(currentHotkeys.delete)) { e.preventDefault(); performDelete(); return; }
+      if (matchesHotkey(currentHotkeys.bringForward)) { e.preventDefault(); performBringForward(); return; }
+      if (matchesHotkey(currentHotkeys.sendBackward)) { e.preventDefault(); performSendBackward(); return; }
     };
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // Cleanup
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       fabricCanvas.dispose();
