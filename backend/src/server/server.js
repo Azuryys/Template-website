@@ -101,6 +101,9 @@ app.get('/api/admin/users', async (req, res) => {
     const session = await requireAdminSession(req, res);
     if (!session) return;
 
+    const actorRole = session.user.role || session.user.usertype || 'user';
+    const actorIsSuperAdmin = actorRole === 'superadmin';
+
     const result = await pool.query(
       `SELECT id, name, email, role, usertype, created_at
        FROM "user"
@@ -121,7 +124,11 @@ app.get('/api/admin/users', async (req, res) => {
       };
     });
 
-    res.json({ users });
+    const visibleUsers = actorIsSuperAdmin
+      ? users
+      : users.filter((listedUser) => !listedUser.isSuperAdmin);
+
+    res.json({ users: visibleUsers });
   } catch (error) {
     console.error('Erro ao listar usuários:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -169,6 +176,9 @@ app.post('/api/admin/reports', async (req, res) => {
     const session = await requireAdminSession(req, res);
     if (!session) return;
 
+    const actorRole = session.user.role || session.user.usertype || 'user';
+    const actorIsSuperAdmin = actorRole === 'superadmin';
+
     const { targetUserId, description } = req.body;
     const trimmedDescription = typeof description === 'string' ? description.trim() : '';
 
@@ -196,6 +206,10 @@ app.post('/api/admin/reports', async (req, res) => {
     const targetUser = targetUserResult.rows[0];
     const targetRole = targetUser.role || targetUser.usertype || 'user';
     const targetIsAdmin = targetRole === 'admin' || targetRole === 'superadmin';
+
+    if (actorIsSuperAdmin && targetRole === 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin não pode reportar outro superadmin' });
+    }
 
     if (!targetIsAdmin) {
       return res.status(403).json({ error: 'Só é possível reportar contas de admin' });

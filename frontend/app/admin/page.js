@@ -21,6 +21,9 @@ export default function AdminPage() {
   const router = useRouter();
   const currentRole = user?.role || user?.usertype || 'user';
   const currentUserIsSuperAdmin = currentRole === 'superadmin';
+  const displayedUsers = currentUserIsSuperAdmin
+    ? users
+    : users.filter((listedUser) => !listedUser.isSuperAdmin);
 
   const fetchUsers = async () => {
     try {
@@ -36,7 +39,8 @@ export default function AdminPage() {
         throw new Error(data?.error || 'Falha ao carregar utilizadores');
       }
 
-      setUsers(data.users || []);
+      const rawUsers = data.users || [];
+      setUsers(rawUsers);
     } catch (err) {
       setError(err.message || 'Erro ao carregar utilizadores');
     } finally {
@@ -200,7 +204,7 @@ export default function AdminPage() {
 
           {loadingUsers ? (
             <p className="text-gray-500">A carregar utilizadores...</p>
-          ) : users.length === 0 ? (
+          ) : displayedUsers.length === 0 ? (
             <p className="text-gray-500">Não há utilizadores para mostrar.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -215,10 +219,11 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((listedUser) => {
+                  {displayedUsers.map((listedUser) => {
                     const isCurrentUser = listedUser.id === user.id;
                     const isProtectedByRole = listedUser.isAdmin && !currentUserIsSuperAdmin;
                     const deleteBlocked = isCurrentUser || isProtectedByRole || deletingUserId === listedUser.id;
+                    const reportBlockedByRole = currentUserIsSuperAdmin && listedUser.isSuperAdmin;
                     const roleLabel = listedUser.isSuperAdmin ? 'superadmin' : (listedUser.isAdmin ? 'admin' : 'user');
                     return (
                       <tr key={listedUser.id} className="border-b border-gray-100">
@@ -235,7 +240,7 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="py-3">
-                          {listedUser.isAdmin && (
+                          {listedUser.isAdmin && !reportBlockedByRole && (
                             <button
                               onClick={() => openReportModal(listedUser)}
                               disabled={isCurrentUser}

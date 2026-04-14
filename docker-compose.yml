@@ -38,5 +38,5 @@ services:
       - /app/node_modules
     depends_on:
       - backend
-    command: sh -c "npm install && npm run dev -- -H 0.0.0.0 -p 3000"
+    command: sh -c "npm install && npm run dev -- --webpack -H 0.0.0.0 -p 3000"
 
