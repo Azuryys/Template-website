@@ -13,18 +13,25 @@ import {
   FaSpinner,
   FaUsers,
   FaBox,
-  FaImage
+  FaImage,
+  FaBell,
+  FaExclamationTriangle
 } from "react-icons/fa";
 
 export default function Header({ isAdmin, handleLogout, userName = "User", userAvatar = null, userRole = 'user', onAvatarUpdate }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState(null);
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
+  const reportsRef = useRef(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -37,12 +44,13 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
       }
+      if (reportsRef.current && !reportsRef.current.contains(event.target)) {
+        setReportsOpen(false);
+      }
     };
-    if (menuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [menuOpen]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const initials = useMemo(() => {
     const safeName = String(userName || "User").trim();
@@ -64,6 +72,36 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
     () => (normalizedRole === 'superadmin' ? 'SuperAdmin' : (normalizedRole === 'admin' ? 'Administrador' : 'Utilizador')),
     [normalizedRole]
   );
+
+  const loadReports = async () => {
+    if (normalizedRole !== 'superadmin') {
+      return;
+    }
+
+    try {
+      setReportsLoading(true);
+      setReportsError(null);
+
+      const res = await fetch('http://localhost:3001/api/admin/reports', {
+        credentials: 'include',
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Falha ao carregar reports');
+      }
+
+      setReports(data.reports || []);
+    } catch (error) {
+      setReportsError(error.message || 'Erro ao carregar reports');
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
+  }, [normalizedRole]);
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
@@ -143,101 +181,181 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
               </span>
             </Link>
 
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                className={`flex items-center gap-3 pl-1 pr-2 py-1 rounded-full transition-all duration-200 ${
-                  menuOpen ? "bg-gray-100" : "hover:bg-gray-50"
-                }`}
-              >
-                <div 
-                  className="relative w-9 h-9 rounded-full overflow-hidden cursor-pointer group"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowUploadModal(true);
-                    setMenuOpen(false);
-                  }}
-                >
-                  {userAvatar ? (
-                    <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-gray-900 flex items-center justify-center text-white font-medium text-sm">
-                      {initials}
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <FaCamera className="w-4 h-4 text-white" />
-                  </div>
-                </div>
-                
-                <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-gray-900">{userName}</p>
-                  <p className="text-xs text-gray-500">{roleLabel}</p>
-                </div>
+            <div className="flex items-center gap-3">
+              {normalizedRole === 'superadmin' && (
+                <div className="relative" ref={reportsRef}>
+                  <button
+                    onClick={() => setReportsOpen(!reportsOpen)}
+                    className={`relative flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                      reportsOpen ? 'border-gray-300 bg-gray-100 text-gray-900' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                    aria-label="Ver reports de admins"
+                  >
+                    <FaBell className="h-4 w-4" />
+                    {reports.length > 0 && (
+                      <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
+                        {reports.length > 99 ? '99+' : reports.length}
+                      </span>
+                    )}
+                  </button>
 
-                <FaChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`} />
-              </button>
+                  <div className={`absolute right-0 top-full mt-3 w-[24rem] max-w-[calc(100vw-1.5rem)] transition-all duration-200 ${
+                    reportsOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible -translate-y-1 pointer-events-none'
+                  }`}>
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+                      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-900">Reports de admins</h3>
+                          <p className="text-xs text-gray-500">Visíveis apenas para superadmin</p>
+                        </div>
+                        <button
+                          onClick={loadReports}
+                          className="text-xs font-medium text-gray-600 hover:text-gray-900"
+                        >
+                          Atualizar
+                        </button>
+                      </div>
 
-              <div className={`absolute right-0 top-full mt-2 w-72 transition-all duration-200 ${
-                menuOpen ? "opacity-100 visible translate-y-0" : "opacity-0 invisible -translate-y-1 pointer-events-none"
-              }`}>
-                <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
-                  <div className="px-5 py-4 border-b border-gray-100">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="relative w-11 h-11 rounded-full overflow-hidden cursor-pointer group flex-shrink-0"
-                        onClick={() => { setShowUploadModal(true); setMenuOpen(false); }}
-                      >
-                        {userAvatar ? (
-                          <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                      <div className="max-h-[28rem] overflow-y-auto p-3">
+                        {reportsLoading ? (
+                          <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500">
+                            <FaSpinner className="h-4 w-4 animate-spin" />
+                            A carregar reports...
+                          </div>
+                        ) : reportsError ? (
+                          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {reportsError}
+                          </div>
+                        ) : reports.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">
+                            Ainda não existem reports.
+                          </div>
                         ) : (
-                          <div className="w-full h-full bg-gray-900 flex items-center justify-center text-white font-semibold">
-                            {initials}
+                          <div className="space-y-3">
+                            {reports.map((report) => (
+                              <article key={report.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                <div className="flex items-start gap-3">
+                                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-red-100 text-red-600">
+                                    <FaExclamationTriangle className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0 flex-1 space-y-2">
+                                    <div>
+                                      <p className="text-sm font-semibold text-gray-900">{report.targetName}</p>
+                                      <p className="text-xs text-gray-500">{report.targetEmail}</p>
+                                    </div>
+                                    <p className="text-sm text-gray-700">{report.description}</p>
+                                    <div className="space-y-1 text-xs text-gray-500">
+                                      <p><span className="font-medium text-gray-700">Reportado por:</span> {report.reporterName}</p>
+                                      <p>{report.reporterEmail}</p>
+                                      <p>{report.createdAt ? new Date(report.createdAt).toLocaleString('pt-PT') : ''}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </article>
+                            ))}
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <FaCamera className="w-4 h-4 text-white" />
-                        </div>
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-gray-900 truncate">{userName}</h3>
-                        <p className="text-xs text-gray-500">{roleLabel}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">Clique na foto para alterar</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className={`flex items-center gap-3 pl-1 pr-2 py-1 rounded-full transition-all duration-200 ${
+                    menuOpen ? "bg-gray-100" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <div 
+                    className="relative w-9 h-9 rounded-full overflow-hidden cursor-pointer group"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowUploadModal(true);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    {userAvatar ? (
+                      <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-900 flex items-center justify-center text-white font-medium text-sm">
+                        {initials}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <FaCamera className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-gray-900">{userName}</p>
+                    <p className="text-xs text-gray-500">{roleLabel}</p>
                   </div>
 
-                  <div className="p-2">
-                    {isAdmin && (
-                      <>
-                        <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                          <FaUsers className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium">Ver Utilizadores</span>
-                        </Link>
-                        <Link href="/templates" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                          <FaBox className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium">Criar Templates</span>
-                        </Link>
-                        <Link href="/logos" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                          <FaImage className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium">Adicionar Logos</span>
-                        </Link>
-                        <div className="h-px bg-gray-100 my-1 mx-2" />
-                        <Link href="/Register" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                          <FaUserPlus className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium">Criar Utilizador</span>
-                        </Link>
-                        <Link href="/admin" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                          <FaShieldAlt className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-medium">Painel Admin</span>
-                        </Link>
-                        <div className="h-px bg-gray-100 my-1 mx-2" />
-                      </>
-                    )}
-                    <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-200">
-                      <FaSignOutAlt className="w-4 h-4" />
-                      <span className="text-sm font-medium">Terminar Sessão</span>
-                    </button>
+                  <FaChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                <div className={`absolute right-0 top-full mt-2 w-72 transition-all duration-200 ${
+                  menuOpen ? "opacity-100 visible translate-y-0" : "opacity-0 invisible -translate-y-1 pointer-events-none"
+                }`}>
+                  <div className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="relative w-11 h-11 rounded-full overflow-hidden cursor-pointer group flex-shrink-0"
+                          onClick={() => { setShowUploadModal(true); setMenuOpen(false); }}
+                        >
+                          {userAvatar ? (
+                            <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-gray-900 flex items-center justify-center text-white font-semibold">
+                              {initials}
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <FaCamera className="w-4 h-4 text-white" />
+                          </div>
+                      </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">{userName}</h3>
+                          <p className="text-xs text-gray-500">{roleLabel}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">Clique na foto para alterar</p>
+                    </div>
+                    <div className="p-2">
+                      {isAdmin && (
+                        <>
+                          <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                            <FaUsers className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium">Ver Utilizadores</span>
+                          </Link>
+                          <Link href="/templates" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                            <FaBox className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium">Criar Templates</span>
+                          </Link>
+                          <Link href="/logos" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                            <FaImage className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium">Adicionar Logos</span>
+                          </Link>
+                          <div className="h-px bg-gray-100 my-1 mx-2" />
+                          <Link href="/Register" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                            <FaUserPlus className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium">Criar Utilizador</span>
+                          </Link>
+                          <Link href="/admin" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                            <FaShieldAlt className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium">Painel Admin</span>
+                          </Link>
+                          <div className="h-px bg-gray-100 my-1 mx-2" />
+                        </>
+                      )}
+                      <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-200">
+                        <FaSignOutAlt className="w-4 h-4" />
+                        <span className="text-sm font-medium">Terminar Sessão</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

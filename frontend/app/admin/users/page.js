@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import Header from "@/components/Header";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaTimes } from "react-icons/fa";
 import Link from "next/link";
 
 export default function UsersPage() {
@@ -14,6 +14,11 @@ export default function UsersPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [error, setError] = useState("");
   const [deletingUserId, setDeletingUserId] = useState(null);
+  const [reportTargetUser, setReportTargetUser] = useState(null);
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportError, setReportError] = useState("");
+  const [reportSuccess, setReportSuccess] = useState("");
   const router = useRouter();
   const currentRole = user?.role || user?.usertype || "user";
   const currentUserIsSuperAdmin = currentRole === "superadmin";
@@ -67,6 +72,60 @@ export default function UsersPage() {
     }
   };
 
+  const openReportModal = (targetUser) => {
+    setReportTargetUser(targetUser);
+    setReportDescription("");
+    setReportError("");
+    setReportSuccess("");
+  };
+
+  const closeReportModal = () => {
+    setReportTargetUser(null);
+    setReportDescription("");
+    setReportError("");
+    setReportSuccess("");
+  };
+
+  const handleReportUser = async (event) => {
+    event.preventDefault();
+
+    if (!reportTargetUser) {
+      return;
+    }
+
+    try {
+      setReportSubmitting(true);
+      setReportError("");
+      setReportSuccess("");
+
+      const response = await fetch("http://localhost:3001/api/admin/reports", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          targetUserId: reportTargetUser.id,
+          description: reportDescription,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Não foi possível reportar o utilizador");
+      }
+
+      setReportSuccess("Report submetido com sucesso.");
+      setTimeout(() => {
+        closeReportModal();
+      }, 900);
+    } catch (err) {
+      setReportError(err.message || "Erro ao reportar utilizador");
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     const checkSession = async () => {
       const { data: session } = await authClient.getSession();
@@ -117,7 +176,7 @@ export default function UsersPage() {
             <span className="text-sm">Voltar</span>
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">Ver Utilizadores</h1>
-          <p className="text-gray-600 mt-2">Lista de utilizadores registados no sistema</p>
+          <p className="text-gray-600 mt-2">Lista de todos os users</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
@@ -184,6 +243,20 @@ export default function UsersPage() {
                           {listedUser.createdAt ? new Date(listedUser.createdAt).toLocaleDateString("pt-PT") : "-"}
                         </td>
                         <td className="py-3">
+                          {listedUser.isAdmin && (
+                            <button
+                              onClick={() => openReportModal(listedUser)}
+                              disabled={isCurrentUser}
+                              className="mr-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
+                              title={
+                                isCurrentUser
+                                  ? "Não pode reportar a sua própria conta"
+                                  : "Reportar admin"
+                              }
+                            >
+                              Reportar
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeleteUser(listedUser)}
                             disabled={deleteBlocked}
@@ -208,6 +281,64 @@ export default function UsersPage() {
           )}
         </div>
       </main>
+
+      {reportTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Reportar admin</h2>
+                <p className="text-sm text-gray-500">{reportTargetUser.name || "Sem nome"} · {reportTargetUser.email}</p>
+              </div>
+              <button onClick={closeReportModal} className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-100">
+                <FaTimes className="h-4 w-4 text-gray-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleReportUser} className="space-y-4 px-6 py-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Descrição do report</label>
+                <textarea
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  rows={5}
+                  placeholder="Descreve o problema, comportamento ou motivo do report"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900"
+                />
+              </div>
+
+              {reportError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {reportError}
+                </div>
+              )}
+
+              {reportSuccess && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                  {reportSuccess}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={closeReportModal}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={reportSubmitting || reportDescription.trim().length < 5}
+                  className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-orange-300"
+                >
+                  {reportSubmitting ? "A enviar..." : "Enviar report"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

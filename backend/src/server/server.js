@@ -36,6 +36,20 @@ async function ensureAuthSchema() {
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_reports (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+      target_user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      reporter_user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+      target_name TEXT,
+      target_email TEXT,
+      target_role TEXT,
+      reporter_name TEXT,
+      reporter_email TEXT,
+      description TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 await ensureAuthSchema();
@@ -79,6 +93,7 @@ async function requireAdminSession(req, res) {
 // Rota de health-check - verifica se o backend está rodando
 app.get('/', (req, res) => {
   res.send('Backend rodando');
+  
 });
 
 app.get('/api/admin/users', async (req, res) => {
@@ -109,6 +124,120 @@ app.get('/api/admin/users', async (req, res) => {
     res.json({ users });
   } catch (error) {
     console.error('Erro ao listar usuários:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+app.get('/api/admin/reports', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const actorRole = session.user.role || session.user.usertype || 'user';
+    if (actorRole !== 'superadmin') {
+      return res.status(403).json({ error: 'Apenas superadmin pode ver os reports' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, target_user_id, reporter_user_id, target_name, target_email, target_role, reporter_name, reporter_email, description, created_at
+       FROM admin_reports
+       ORDER BY created_at DESC`
+    );
+
+    const reports = result.rows.map((row) => ({
+      id: row.id,
+      targetUserId: row.target_user_id,
+      reporterUserId: row.reporter_user_id,
+      targetName: row.target_name || 'Sem nome',
+      targetEmail: row.target_email || '-',
+      targetRole: row.target_role || 'user',
+      reporterName: row.reporter_name || 'Sem nome',
+      reporterEmail: row.reporter_email || '-',
+      description: row.description,
+      createdAt: row.created_at,
+    }));
+
+    res.json({ reports });
+  } catch (error) {
+    console.error('Erro ao listar reports:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+app.post('/api/admin/reports', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const { targetUserId, description } = req.body;
+    const trimmedDescription = typeof description === 'string' ? description.trim() : '';
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'ID do utilizador é obrigatório' });
+    }
+
+    if (trimmedDescription.length < 5) {
+      return res.status(400).json({ error: 'Descrição do report é obrigatória' });
+    }
+
+    if (targetUserId === session.user.id) {
+      return res.status(400).json({ error: 'Não pode reportar a sua própria conta' });
+    }
+
+    const targetUserResult = await pool.query(
+      'SELECT id, name, email, role, usertype FROM "user" WHERE id = $1',
+      [targetUserId]
+    );
+
+    if (targetUserResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Utilizador não encontrado' });
+    }
+
+    const targetUser = targetUserResult.rows[0];
+    const targetRole = targetUser.role || targetUser.usertype || 'user';
+    const targetIsAdmin = targetRole === 'admin' || targetRole === 'superadmin';
+
+    if (!targetIsAdmin) {
+      return res.status(403).json({ error: 'Só é possível reportar contas de admin' });
+    }
+
+    const reporterName = session.user.name || session.user.email || 'Sem nome';
+    const reporterEmail = session.user.email || '-';
+
+    const result = await pool.query(
+      `INSERT INTO admin_reports (
+        target_user_id,
+        reporter_user_id,
+        target_name,
+        target_email,
+        target_role,
+        reporter_name,
+        reporter_email,
+        description
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id, created_at`,
+      [
+        targetUser.id,
+        session.user.id,
+        targetUser.name || 'Sem nome',
+        targetUser.email,
+        targetRole,
+        reporterName,
+        reporterEmail,
+        trimmedDescription,
+      ]
+    );
+
+    res.status(201).json({
+      success: true,
+      report: {
+        id: result.rows[0].id,
+        createdAt: result.rows[0].created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao criar report:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
@@ -485,6 +614,7 @@ app.all("/api/auth/*", toNodeHandler(auth));
 
 const PORT = process.env.PORT || 5000;  // Porta 3001 (vem do .env)
 const server = app.listen(PORT, () => {
+  console.log("   Backend iniciado com sucesso"); 
   console.log(`🚀 Backend: http://localhost:${PORT}`);
   console.log(`📁 Avatars: ${avatarsDir}`);
 });

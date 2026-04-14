@@ -99,6 +99,23 @@ async function createTables() {
     await pool.query(`ALTER TABLE "verification" ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();`);
     console.log('✅ Colunas da tabela "verification" verificadas');
 
+    // Tabela admin_reports
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admin_reports (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+        target_user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+        reporter_user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+        target_name TEXT,
+        target_email TEXT,
+        target_role TEXT,
+        reporter_name TEXT,
+        reporter_email TEXT,
+        description TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    console.log('✅ Tabela "admin_reports" criada');
+
     console.log('\n✨ Tabelas criadas! Podes criar users agora.');
   } catch (error) {
     console.error('❌ Erro:', error.message);
