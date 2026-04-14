@@ -73,20 +73,22 @@ export const initializeEmailHeader = (template) => {
   // Text box using ratio-based positioning
   const textBoxWidth = CANVAS_WIDTH * textBoxConfig.widthRatio;
   const textBoxHeight = CANVAS_HEIGHT * textBoxConfig.heightRatio;
-  const textBox = new Textbox('Coloque Texto', {
-    left: CANVAS_WIDTH * textBoxConfig.leftRatio,
-    top: CANVAS_HEIGHT * textBoxConfig.topRatio + (textBoxHeight / 2) - 20,
-    width: textBoxWidth,
-    fontSize: textBoxConfig.fontSize || 32,
-    fontFamily: 'BauerMediaSans',
-    fontWeight: 400,
-    fill: '#ffffff',
-    textAlign: textBoxConfig.textAlign || 'center',
-    hasControls: true,
-    selectable: true,
-    editable: true,
-    name: 'textBox',
-  });
+const textBox = new Textbox('Coloque Texto', {
+  left: CANVAS_WIDTH * textBoxConfig.leftRatio,
+  top: CANVAS_HEIGHT * textBoxConfig.topRatio, // ✅ removed the centering offset
+  width: textBoxWidth,
+  fontSize: textBoxConfig.fontSize || 32,
+  fontFamily: 'BauerMediaSans',
+  fontWeight: 400,
+  fill: '#ffffff',
+  textAlign: textBoxConfig.textAlign || 'center',
+  hasControls: true,
+  selectable: true,
+  editable: true,
+  name: 'textBox',
+  originX: 'left', // ✅ added
+  originY: 'top',  // ✅ added
+});
   elements.push(textBox);
 
   return elements;
