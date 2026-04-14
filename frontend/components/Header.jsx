@@ -34,12 +34,14 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
   const reportsRef = useRef(null);
 
   useEffect(() => {
+    // Marca quando o utilizador fez scroll para ajustar o estilo do header.
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
+    // Fecha dropdowns quando clicar fora do menu.
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false);
@@ -73,6 +75,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
     [normalizedRole]
   );
 
+  // Carrega reports para o sino do superadmin no header.
   const loadReports = async () => {
     if (normalizedRole !== 'superadmin') {
       return;
@@ -103,6 +106,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
     loadReports();
   }, [normalizedRole]);
 
+  // Recebe imagem do input e prepara preview antes de guardar.
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     setUploadError(null);
@@ -119,6 +123,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
     reader.readAsDataURL(file);
   };
 
+  // Guarda avatar no backend e atualiza a foto no frontend.
   const handleSaveAvatar = async () => {
     if (!previewImage) return;
     
@@ -153,6 +158,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
     }
   };
 
+  // Fecha modal de avatar e limpa estados temporarios.
   const handleCancel = () => {
     setShowUploadModal(false);
     setPreviewImage(null);
@@ -345,10 +351,10 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                             <span className="text-sm font-medium">Criar Utilizador</span>
                           </Link>
                           <Link href="/admin" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                            <FaShieldAlt className="w-4 h-4 text-gray-500" />
+                           <FaShieldAlt className="w-4 h-4 text-gray-500" />
                             <span className="text-sm font-medium">Painel Admin</span>
                           </Link>
-                          <div className="h-px bg-gray-100 my-1 mx-2" />
+                          <div className="h-px bg-gray-100 my-1 mx-2" /> 
                         </>
                       )}
                       <button onClick={() => { handleLogout(); setMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-200">

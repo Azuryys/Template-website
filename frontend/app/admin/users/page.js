@@ -26,6 +26,7 @@ export default function UsersPage() {
     ? users
     : users.filter((listedUser) => !listedUser.isSuperAdmin);
 
+  // Carrega os utilizadores visiveis para a tabela de Ver Utilizadores.
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
@@ -49,6 +50,7 @@ export default function UsersPage() {
     }
   };
 
+  // Apaga um utilizador da base de dados a partir da tabela de Ver Utilizadores.
   const handleDeleteUser = async (userToDelete) => {
     if (!window.confirm(`Tem a certeza que quer apagar a conta ${userToDelete.email}?`)) {
       return;
@@ -76,6 +78,7 @@ export default function UsersPage() {
     }
   };
 
+  // Abre a modal para reportar um admin.
   const openReportModal = (targetUser) => {
     setReportTargetUser(targetUser);
     setReportDescription("");
@@ -83,6 +86,7 @@ export default function UsersPage() {
     setReportSuccess("");
   };
 
+  // Fecha a modal de report e limpa os campos.
   const closeReportModal = () => {
     setReportTargetUser(null);
     setReportDescription("");
@@ -90,6 +94,7 @@ export default function UsersPage() {
     setReportSuccess("");
   };
 
+  // Envia o report do admin selecionado para o backend.
   const handleReportUser = async (event) => {
     event.preventDefault();
 
@@ -131,6 +136,7 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
+    // Valida sessao e permissao antes de mostrar a pagina de Ver Utilizadores.
     const checkSession = async () => {
       const { data: session } = await authClient.getSession();
       if (!session?.user) {
@@ -212,7 +218,7 @@ export default function UsersPage() {
                   <tr className="border-b border-gray-200 text-left text-gray-600">
                     <th className="py-3 pr-4">Nome</th>
                     <th className="py-3 pr-4">Email</th>
-                    <th className="py-3 pr-4">Perfil</th>
+                    <th className="py-3 pr-4">Tipo de Utilizador</th>
                     <th className="py-3 pr-4">Admin</th>
                     <th className="py-3 pr-4">Criado em</th>
                     <th className="py-3">Ações</th>

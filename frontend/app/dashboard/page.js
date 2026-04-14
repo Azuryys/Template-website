@@ -26,6 +26,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
+    // Carrega a sessao atual e prepara os templates da dashboard.
     const loadSession = async () => {
       try {
         const { data: session } = await authClient.getSession();
@@ -48,11 +49,13 @@ export default function Dashboard() {
     loadSession();
   }, [router]);
 
+  // Faz logout e redireciona para login.
   const handleLogout = async () => {
     await authClient.signOut();
     router.push('/Login');
   };
 
+  // Abre o editor custom com a largura/altura escolhida.
   const handleCustomSubmit = (e) => {
     e.preventDefault();
     const w = parseInt(customWidth, 10);

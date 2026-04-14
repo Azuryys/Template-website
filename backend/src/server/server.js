@@ -12,13 +12,53 @@ import { pool } from './lib/db.js';  // ← importa Pool do db.js (conexão com 
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
 import { hashPassword } from 'better-auth/crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
+const LOGO_LIBRARY_CONFIG = [
+  { category: 'logo', folder: 'Logo' },
+  { category: 'audio', folder: 'Logo_Audio' },
+];
 
+// Le os ficheiros das pastas de logos do frontend para montar a biblioteca.
+async function readLogoLibrary() {
+  const logos = [];
+
+  for (const config of LOGO_LIBRARY_CONFIG) {
+    const folderPath = join(__dirname, '..', '..', '..', 'frontend', 'public', 'BauerImages', config.folder);
+
+    try {
+      const fileNames = await readdir(folderPath);
+      const imageFileNames = fileNames.filter((fileName) => /\.(png|jpe?g|webp|svg)$/i.test(fileName));
+
+      imageFileNames.forEach((fileName) => {
+        const cleanName = fileName
+          .replace(/\.[^.]+$/, '')
+          .replace(/[_-]+/g, ' ')
+          .trim();
+
+        logos.push({
+          id: `${config.category}-${fileName}`,
+          name: cleanName,
+          fileName,
+          filePath: `/BauerImages/${config.folder}/${fileName}`,
+          category: config.category,
+        });
+      });
+    } catch (error) {
+      if (error?.code !== 'ENOENT') {
+        console.error(`Erro ao ler pasta de logos ${folderPath}:`, error);
+      }
+    }
+  }
+
+  return logos;
+}
+
+// Garante que as tabelas e colunas obrigatorias existem na base de dados.
 async function ensureAuthSchema() {
   await pool.query(`ALTER TABLE "session" ADD COLUMN IF NOT EXISTS ip_address TEXT`);
   await pool.query(`ALTER TABLE "session" ADD COLUMN IF NOT EXISTS user_agent TEXT`);
@@ -50,6 +90,17 @@ async function ensureAuthSchema() {
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_logos (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE (category, file_path)
+    )
+  `);
 }
 
 await ensureAuthSchema();
@@ -70,6 +121,7 @@ app.use('/avatars', express.static(avatarsDir));
 // Middleware para parsear JSON nos requests (depois do handler do Better Auth)
 app.use(express.json());
 
+// Valida sessao e permissao admin para proteger rotas administrativas.
 async function requireAdminSession(req, res) {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
@@ -96,6 +148,7 @@ app.get('/', (req, res) => {
   
 });
 
+// Rota de ver utilizadores para o painel admin.
 app.get('/api/admin/users', async (req, res) => {
   try {
     const session = await requireAdminSession(req, res);
@@ -135,6 +188,7 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
+// Rota para o superadmin ver reports enviados por admins.
 app.get('/api/admin/reports', async (req, res) => {
   try {
     const session = await requireAdminSession(req, res);
@@ -171,6 +225,107 @@ app.get('/api/admin/reports', async (req, res) => {
   }
 });
 
+// Devolve a biblioteca de logos existente nas pastas da app.
+app.get('/api/logos/library', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const logos = await readLogoLibrary();
+    res.json({ logos });
+  } catch (error) {
+    console.error('Erro ao carregar biblioteca de logos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Lista logos que ja foram guardados na base de dados.
+app.get('/api/logos', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const result = await pool.query(
+      `SELECT id, name, category, file_path, created_by, created_at
+       FROM app_logos
+       ORDER BY created_at DESC`
+    );
+
+    const logos = result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      filePath: row.file_path,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+    }));
+
+    res.json({ logos });
+  } catch (error) {
+    console.error('Erro ao listar logos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Cria ou atualiza um logo na base de dados usando ficheiro ja existente.
+app.post('/api/logos', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const { name, category, filePath } = req.body;
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    const normalizedCategory = typeof category === 'string' ? category.trim().toLowerCase() : '';
+    const normalizedPath = typeof filePath === 'string' ? filePath.trim() : '';
+
+    if (!normalizedName) {
+      return res.status(400).json({ error: 'Nome é obrigatório' });
+    }
+
+    if (!['logo', 'audio'].includes(normalizedCategory)) {
+      return res.status(400).json({ error: 'Categoria inválida' });
+    }
+
+    if (!normalizedPath.startsWith('/BauerImages/')) {
+      return res.status(400).json({ error: 'Caminho do logo inválido' });
+    }
+
+    const library = await readLogoLibrary();
+    const fileExistsInLibrary = library.some(
+      (item) => item.category === normalizedCategory && item.filePath === normalizedPath
+    );
+
+    if (!fileExistsInLibrary) {
+      return res.status(400).json({ error: 'Logo não encontrado nas pastas da app' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO app_logos (name, category, file_path, created_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (category, file_path)
+       DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name, category, file_path, created_by, created_at`,
+      [normalizedName, normalizedCategory, normalizedPath, session.user.id]
+    );
+
+    const row = result.rows[0];
+    res.status(201).json({
+      logo: {
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        filePath: row.file_path,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao criar logo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Cria um report de admin para analise do superadmin.
 app.post('/api/admin/reports', async (req, res) => {
   try {
     const session = await requireAdminSession(req, res);
@@ -256,6 +411,7 @@ app.post('/api/admin/reports', async (req, res) => {
   }
 });
 
+// Apaga utilizador selecionado no painel admin.
 app.delete('/api/admin/users/:id', async (req, res) => {
   try {
     const session = await requireAdminSession(req, res);
@@ -317,6 +473,7 @@ app.delete('/api/admin/users/:id', async (req, res) => {
   }
 });
 
+// Cria um novo utilizador pela area de administracao.
 app.post('/api/admin/create-user', async (req, res) => {
   try {
     const session = await requireAdminSession(req, res);

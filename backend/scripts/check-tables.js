@@ -62,6 +62,21 @@ async function checkDatabase() {
     const reportCount = await pool.query('SELECT COUNT(*) FROM admin_reports');
     console.log(`  📊 Total de reports: ${reportCount.rows[0].count}\n`);
 
+    // Verifica tabela "app_logos"
+    console.log('📋 Tabela "app_logos":');
+    const logosColumns = await pool.query(`
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_name = 'app_logos'
+      ORDER BY ordinal_position;
+    `);
+    logosColumns.rows.forEach(row => {
+      console.log(`  - ${row.column_name}: ${row.data_type}`);
+    });
+
+    const logosCount = await pool.query('SELECT COUNT(*) FROM app_logos');
+    console.log(`  📊 Total de logos guardados: ${logosCount.rows[0].count}\n`);
+
     console.log('✨ Verificação completa!');
   } catch (error) {
     console.error('❌ Erro ao verificar base de dados:', error.message);

@@ -116,6 +116,20 @@ async function createTables() {
     `);
     console.log('✅ Tabela "admin_reports" criada');
 
+    // Tabela app_logos
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_logos (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE (category, file_path)
+      );
+    `);
+    console.log('✅ Tabela "app_logos" criada');
+
     console.log('\n✨ Tabelas criadas! Podes criar users agora.');
   } catch (error) {
     console.error('❌ Erro:', error.message);

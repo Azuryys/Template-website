@@ -25,6 +25,7 @@ export default function AdminPage() {
     ? users
     : users.filter((listedUser) => !listedUser.isSuperAdmin);
 
+  // Carrega os utilizadores para o painel admin.
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
@@ -49,6 +50,7 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    // Se nao existir sessao admin, redireciona para login/dashboard.
     const loadSessionAndUsers = async () => {
       try {
         const { data: session } = await authClient.getSession();
@@ -57,6 +59,7 @@ export default function AdminPage() {
           return;
         }
 
+        // Termina sessao e volta para a pagina de login.
         const role = session.user.role || session.user.usertype;
         const isAdmin = role === 'admin' || role === 'superadmin';
         if (!isAdmin) {
@@ -82,6 +85,7 @@ export default function AdminPage() {
     router.push('/Login');
   };
 
+  // Remove utilizador selecionado da tabela e da base de dados.
   const handleDeleteUser = async (userToDelete) => {
     if (!window.confirm(`Tem a certeza que quer apagar a conta ${userToDelete.email}?`)) {
       return;
@@ -109,6 +113,7 @@ export default function AdminPage() {
     }
   };
 
+  // Abre modal para reportar outro admin.
   const openReportModal = (targetUser) => {
     setReportTargetUser(targetUser);
     setReportDescription('');
@@ -116,6 +121,7 @@ export default function AdminPage() {
     setReportSuccess('');
   };
 
+  // Fecha a modal de report e limpa os estados relacionados.
   const closeReportModal = () => {
     setReportTargetUser(null);
     setReportDescription('');
@@ -123,6 +129,7 @@ export default function AdminPage() {
     setReportSuccess('');
   };
 
+  // Submete o report para o endpoint de reports.
   const handleReportUser = async (event) => {
     event.preventDefault();
 
