@@ -71,7 +71,7 @@ export default function Dashboard() {
       <Header isAdmin={isAdmin} handleLogout={handleLogout} userName={user?.name || user?.email || 'User'} userAvatar={user?.image || null} userRole={user?.role || user?.usertype || 'user'} />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto pt-24 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="mb-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Selecione um Template

@@ -26,6 +26,7 @@ export default function AdminPage() {
     try {
       setLoadingUsers(true);
       setError('');
+
       const response = await fetch('http://localhost:3001/api/admin/users', {
         credentials: 'include',
       });
@@ -60,6 +61,7 @@ export default function AdminPage() {
         }
 
         setUser(session.user);
+
         await fetchUsers();
       } catch (err) {
         router.push('/Login');
