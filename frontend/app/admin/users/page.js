@@ -22,9 +22,19 @@ export default function UsersPage() {
   const router = useRouter();
   const currentRole = user?.role || user?.usertype || "user";
   const currentUserIsSuperAdmin = currentRole === "superadmin";
-  const displayedUsers = currentUserIsSuperAdmin
-    ? users
-    : users.filter((listedUser) => !listedUser.isSuperAdmin);
+  const currentUserIsAdmin = currentRole === "admin";
+  const displayedUsers = users.filter((listedUser) => {
+    const isCurrentUser = listedUser.id === user?.id;
+    if (isCurrentUser) {
+      return false;
+    }
+
+    if (!currentUserIsSuperAdmin && listedUser.isSuperAdmin) {
+      return false;
+    }
+
+    return true;
+  });
 
   // Carrega os utilizadores visiveis para a tabela de Ver Utilizadores.
   const fetchUsers = async () => {
@@ -217,9 +227,7 @@ export default function UsersPage() {
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-600">
                     <th className="py-3 pr-4">Nome</th>
-                    <th className="py-3 pr-4">Email</th>
                     <th className="py-3 pr-4">Tipo de Utilizador</th>
-                    <th className="py-3 pr-4">Admin</th>
                     <th className="py-3 pr-4">Criado em</th>
                     <th className="py-3">Ações</th>
                   </tr>
@@ -229,7 +237,7 @@ export default function UsersPage() {
                     const isCurrentUser = listedUser.id === user.id;
                     const isProtectedByRole = listedUser.isAdmin && !currentUserIsSuperAdmin;
                     const deleteBlocked = isCurrentUser || isProtectedByRole || deletingUserId === listedUser.id;
-                    const reportBlockedByRole = currentUserIsSuperAdmin && listedUser.isSuperAdmin;
+                    const canReportUser = listedUser.isAdmin && currentUserIsAdmin && !currentUserIsSuperAdmin && !isCurrentUser;
                     const roleLabel = listedUser.isSuperAdmin
                       ? "superadmin"
                       : listedUser.isAdmin
@@ -239,31 +247,20 @@ export default function UsersPage() {
                     return (
                       <tr key={listedUser.id} className="border-b border-gray-100">
                         <td className="py-3 pr-4 text-gray-900">{listedUser.name || "Sem nome"}</td>
-                        <td className="py-3 pr-4 text-gray-700">{listedUser.email}</td>
                         <td className="py-3 pr-4">
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${listedUser.isSuperAdmin ? "bg-purple-100 text-purple-700" : listedUser.isAdmin ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
                             {roleLabel}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-4">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${listedUser.isAdmin ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                            {listedUser.isAdmin ? "Sim" : "Não"}
                           </span>
                         </td>
                         <td className="py-3 text-gray-700">
                           {listedUser.createdAt ? new Date(listedUser.createdAt).toLocaleDateString("pt-PT") : "-"}
                         </td>
                         <td className="py-3">
-                          {listedUser.isAdmin && !reportBlockedByRole && (
+                          {canReportUser && (
                             <button
                               onClick={() => openReportModal(listedUser)}
-                              disabled={isCurrentUser}
-                              className="mr-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
-                              title={
-                                isCurrentUser
-                                  ? "Não pode reportar a sua própria conta"
-                                  : "Reportar admin"
-                              }
+                              className="mr-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700"
+                              title="Reportar admin"
                             >
                               Reportar
                             </button>

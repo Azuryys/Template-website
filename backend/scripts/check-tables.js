@@ -77,6 +77,21 @@ async function checkDatabase() {
     const logosCount = await pool.query('SELECT COUNT(*) FROM app_logos');
     console.log(`  📊 Total de logos guardados: ${logosCount.rows[0].count}\n`);
 
+    // Verifica tabela "app_templates"
+    console.log('📋 Tabela "app_templates":');
+    const templatesColumns = await pool.query(`
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_name = 'app_templates'
+      ORDER BY ordinal_position;
+    `);
+    templatesColumns.rows.forEach(row => {
+      console.log(`  - ${row.column_name}: ${row.data_type}`);
+    });
+
+    const templatesCount = await pool.query('SELECT COUNT(*) FROM app_templates');
+    console.log(`  📊 Total de templates guardados: ${templatesCount.rows[0].count}\n`);
+
     console.log('✨ Verificação completa!');
   } catch (error) {
     console.error('❌ Erro ao verificar base de dados:', error.message);

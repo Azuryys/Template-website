@@ -6,14 +6,15 @@
 
 import express from 'express';
 import cors from 'cors';
+import multer from 'multer';
 import 'dotenv/config';
 import { auth } from '../../auth.js';
 import { pool } from './lib/db.js';  // ← importa Pool do db.js (conexão com PostgreSQL)
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
 import { hashPassword } from 'better-auth/crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { writeFile, mkdir, readdir } from 'fs/promises';
-import { join, dirname } from 'path';
+import { writeFile, mkdir, readdir, unlink } from 'fs/promises';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,49 @@ const LOGO_LIBRARY_CONFIG = [
   { category: 'logo', folder: 'Logo' },
   { category: 'audio', folder: 'Logo_Audio' },
 ];
+const BAUER_IMAGES_ROOT = join(__dirname, '..', '..', '..', 'frontend', 'public', 'BauerImages');
+const TEMPLATES_ROOT = join(__dirname, '..', '..', '..', 'frontend', 'public', 'Templates');
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+const templateUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+function toSafeFileBaseName(value) {
+  const normalized = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9-_\s]/g, ' ')
+    .trim()
+    .replace(/\s+/g, '_')
+    .toLowerCase();
+
+  return normalized || `logo_${Date.now()}`;
+}
+
+function normalizeImageExtension(file) {
+  const byMime = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+  };
+
+  if (byMime[file.mimetype]) {
+    return byMime[file.mimetype];
+  }
+
+  const original = String(file.originalname || '');
+  const ext = original.includes('.') ? original.split('.').pop().toLowerCase() : '';
+  if (['jpg', 'jpeg', 'png', 'webp', 'svg'].includes(ext)) {
+    return ext === 'jpeg' ? 'jpg' : ext;
+  }
+
+  return null;
+}
 
 // Le os ficheiros das pastas de logos do frontend para montar a biblioteca.
 async function readLogoLibrary() {
@@ -56,6 +100,47 @@ async function readLogoLibrary() {
   }
 
   return logos;
+}
+
+function getLogoFolderFromCategory(category) {
+  const config = LOGO_LIBRARY_CONFIG.find((item) => item.category === category);
+  return config?.folder || null;
+}
+
+function normalizeTemplateFileExtension(file) {
+  const byMime = {
+    'image/svg+xml': 'svg',
+    'application/json': 'json',
+    'text/plain': 'txt',
+  };
+
+  if (byMime[file.mimetype]) {
+    return byMime[file.mimetype];
+  }
+
+  const original = String(file.originalname || '');
+  const ext = original.includes('.') ? original.split('.').pop().toLowerCase() : '';
+  if (['json', 'svg', 'txt'].includes(ext)) {
+    return ext;
+  }
+
+  return null;
+}
+
+function mapTemplateRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description || '',
+    width: row.width,
+    height: row.height,
+    templateType: row.template_type,
+    sourceTemplateId: row.source_template_id,
+    filePath: row.file_path,
+    canvasData: row.canvas_data,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
 }
 
 // Garante que as tabelas e colunas obrigatorias existem na base de dados.
@@ -101,6 +186,22 @@ async function ensureAuthSchema() {
       UNIQUE (category, file_path)
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_templates (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      description TEXT,
+      width INTEGER,
+      height INTEGER,
+      template_type TEXT NOT NULL DEFAULT 'canvas',
+      source_template_id TEXT,
+      file_path TEXT,
+      canvas_data JSONB,
+      created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 await ensureAuthSchema();
@@ -117,6 +218,8 @@ app.use(cors({
 const avatarsDir = join(__dirname, '..', '..', 'public', 'avatars');
 await mkdir(avatarsDir, { recursive: true });
 app.use('/avatars', express.static(avatarsDir));
+await mkdir(TEMPLATES_ROOT, { recursive: true });
+app.use('/Templates', express.static(TEMPLATES_ROOT));
 
 // Middleware para parsear JSON nos requests (depois do handler do Better Auth)
 app.use(express.json());
@@ -158,7 +261,7 @@ app.get('/api/admin/users', async (req, res) => {
     const actorIsSuperAdmin = actorRole === 'superadmin';
 
     const result = await pool.query(
-      `SELECT id, name, email, role, usertype, created_at
+      `SELECT id, name, role, usertype, created_at
        FROM "user"
        ORDER BY created_at DESC NULLS LAST, email ASC`
     );
@@ -237,6 +340,295 @@ app.get('/api/logos/library', async (req, res) => {
     console.error('Erro ao carregar biblioteca de logos:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
+});
+
+// Devolve os templates estáticos disponíveis para começar um novo layout.
+app.get('/api/templates/library', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const result = await pool.query(
+      `SELECT id, name, description, width, height, template_type, source_template_id, file_path, canvas_data, created_by, created_at
+       FROM app_templates
+       WHERE file_path IS NOT NULL
+       ORDER BY created_at DESC`
+    );
+
+    const templates = result.rows.map(mapTemplateRow);
+
+    res.json({ templates });
+  } catch (error) {
+    console.error('Erro ao carregar biblioteca de templates:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Lista templates guardados na base de dados.
+app.get('/api/templates', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const { sourceTemplateId } = req.query;
+    const queryParams = [];
+    let whereClause = '';
+
+    if (typeof sourceTemplateId === 'string' && sourceTemplateId.trim()) {
+      queryParams.push(sourceTemplateId.trim());
+      whereClause = 'WHERE source_template_id = $1';
+    }
+
+    const result = await pool.query(
+      `SELECT id, name, description, width, height, template_type, source_template_id, file_path, canvas_data, created_by, created_at
+       FROM app_templates
+       ${whereClause}
+       ORDER BY created_at DESC`,
+      queryParams
+    );
+
+    res.json({ templates: result.rows.map(mapTemplateRow) });
+  } catch (error) {
+    console.error('Erro ao listar templates:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Guarda um template criado no editor na base de dados.
+app.post('/api/templates', express.json({ limit: '10mb' }), async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const {
+      name,
+      description,
+      width,
+      height,
+      canvasData,
+      sourceTemplateId,
+      templateType,
+      filePath,
+    } = req.body || {};
+
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    const normalizedDescription = typeof description === 'string' ? description.trim() : '';
+    const normalizedSourceTemplateId = typeof sourceTemplateId === 'string' ? sourceTemplateId.trim() : null;
+    const normalizedTemplateType = typeof templateType === 'string' ? templateType.trim() : 'canvas';
+    const normalizedFilePath = typeof filePath === 'string' && filePath.trim() ? filePath.trim() : null;
+    const parsedWidth = Number.isFinite(Number(width)) ? Number(width) : null;
+    const parsedHeight = Number.isFinite(Number(height)) ? Number(height) : null;
+    let normalizedCanvasData = canvasData;
+
+    if (typeof canvasData === 'string') {
+      try {
+        normalizedCanvasData = JSON.parse(canvasData);
+      } catch (parseError) {
+        return res.status(400).json({ error: 'Canvas data inválido' });
+      }
+    }
+
+    if (!normalizedName) {
+      return res.status(400).json({ error: 'Nome é obrigatório' });
+    }
+
+    if (!normalizedCanvasData && !normalizedFilePath) {
+      return res.status(400).json({ error: 'Dados do template são obrigatórios' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO app_templates (
+        name,
+        description,
+        width,
+        height,
+        template_type,
+        source_template_id,
+        file_path,
+        canvas_data,
+        created_by
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, name, description, width, height, template_type, source_template_id, file_path, canvas_data, created_by, created_at`,
+      [
+        normalizedName,
+        normalizedDescription,
+        parsedWidth,
+        parsedHeight,
+        normalizedTemplateType,
+        normalizedSourceTemplateId,
+        normalizedFilePath,
+        normalizedCanvasData || null,
+        session.user.id,
+      ]
+    );
+
+    res.status(201).json({ template: mapTemplateRow(result.rows[0]) });
+  } catch (error) {
+    console.error('Erro ao guardar template:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Remove template guardado da base de dados.
+app.delete('/api/templates/:id', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const templateId = req.params.id;
+    if (!templateId) {
+      return res.status(400).json({ error: 'ID do template é obrigatório' });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM app_templates
+       WHERE id = $1
+       RETURNING id, file_path`,
+      [templateId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Template não encontrado' });
+    }
+
+    const deleted = result.rows[0];
+    if (deleted.file_path && deleted.file_path.startsWith('/Templates/')) {
+      const safeFileName = basename(deleted.file_path);
+      const diskPath = join(TEMPLATES_ROOT, safeFileName);
+      try {
+        await unlink(diskPath);
+      } catch (fileError) {
+        if (fileError?.code !== 'ENOENT') {
+          console.error('Erro ao remover ficheiro de template:', fileError);
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao apagar template:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Upload de template em ficheiro para a biblioteca.
+app.post('/api/templates/upload', (req, res) => {
+  templateUpload.single('file')(req, res, async (uploadError) => {
+    if (uploadError) {
+      const message = uploadError.code === 'LIMIT_FILE_SIZE'
+        ? 'Ficheiro demasiado grande (máx 10MB)'
+        : 'Erro ao processar upload';
+      return res.status(400).json({ error: message });
+    }
+
+    try {
+      const session = await requireAdminSession(req, res);
+      if (!session) return;
+
+      const normalizedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      const normalizedDescription = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+
+      if (!normalizedName) {
+        return res.status(400).json({ error: 'Nome é obrigatório' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Ficheiro é obrigatório' });
+      }
+
+      const extension = normalizeTemplateFileExtension(req.file);
+      if (!extension) {
+        return res.status(400).json({ error: 'Formato inválido. Use JSON, SVG ou TXT' });
+      }
+
+      const safeBase = toSafeFileBaseName(normalizedName);
+      const fileName = `${safeBase}_${Date.now()}.${extension}`;
+      const filePathOnDisk = join(TEMPLATES_ROOT, fileName);
+
+      await writeFile(filePathOnDisk, req.file.buffer);
+
+      const publicPath = `/Templates/${fileName}`;
+      const result = await pool.query(
+        `INSERT INTO app_templates (
+          name,
+          description,
+          template_type,
+          file_path,
+          created_by
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, name, description, width, height, template_type, source_template_id, file_path, canvas_data, created_by, created_at`,
+        [normalizedName, normalizedDescription, 'file', publicPath, session.user.id]
+      );
+
+      res.status(201).json({ template: mapTemplateRow(result.rows[0]) });
+    } catch (error) {
+      console.error('Erro no upload de template:', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+  });
+});
+
+// Faz upload de um novo ficheiro para a biblioteca de logos no frontend/public.
+app.post('/api/logos/upload', (req, res) => {
+  logoUpload.single('file')(req, res, async (uploadError) => {
+    if (uploadError) {
+      const message = uploadError.code === 'LIMIT_FILE_SIZE'
+        ? 'Ficheiro demasiado grande (máx 5MB)'
+        : 'Erro ao processar upload';
+      return res.status(400).json({ error: message });
+    }
+
+    try {
+      const session = await requireAdminSession(req, res);
+      if (!session) return;
+
+      const normalizedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      const normalizedCategory = typeof req.body?.category === 'string' ? req.body.category.trim().toLowerCase() : '';
+      const targetFolder = getLogoFolderFromCategory(normalizedCategory);
+
+      if (!normalizedName) {
+        return res.status(400).json({ error: 'Nome é obrigatório' });
+      }
+
+      if (!targetFolder) {
+        return res.status(400).json({ error: 'Categoria inválida' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Ficheiro é obrigatório' });
+      }
+
+      const extension = normalizeImageExtension(req.file);
+      if (!extension) {
+        return res.status(400).json({ error: 'Formato inválido. Use PNG, JPG, WEBP ou SVG' });
+      }
+
+      const safeBase = toSafeFileBaseName(normalizedName);
+      const fileName = `${safeBase}_${Date.now()}.${extension}`;
+      const folderPath = join(BAUER_IMAGES_ROOT, targetFolder);
+      const filePathOnDisk = join(folderPath, fileName);
+
+      await mkdir(folderPath, { recursive: true });
+      await writeFile(filePathOnDisk, req.file.buffer);
+
+      const publicPath = `/BauerImages/${targetFolder}/${fileName}`;
+      res.status(201).json({
+        message: 'Upload concluído',
+        logo: {
+          id: `${normalizedCategory}-${fileName}`,
+          name: normalizedName,
+          fileName,
+          filePath: publicPath,
+          category: normalizedCategory,
+        },
+      });
+    } catch (error) {
+      console.error('Erro no upload de logo:', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+  });
 });
 
 // Lista logos que ja foram guardados na base de dados.
@@ -321,6 +713,35 @@ app.post('/api/logos', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao criar logo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Remove logo guardado da base de dados.
+app.delete('/api/logos/:id', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const logoId = req.params.id;
+    if (!logoId) {
+      return res.status(400).json({ error: 'ID do logo é obrigatório' });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM app_logos
+       WHERE id = $1
+       RETURNING id`,
+      [logoId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Logo não encontrado' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao apagar logo:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });

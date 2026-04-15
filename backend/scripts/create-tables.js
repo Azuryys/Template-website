@@ -130,6 +130,25 @@ async function createTables() {
     `);
     console.log('✅ Tabela "app_logos" criada');
 
+    // Tabela app_templates
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS app_templates (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        description TEXT,
+        width INTEGER,
+        height INTEGER,
+        template_type TEXT NOT NULL DEFAULT 'canvas',
+        source_template_id TEXT,
+        file_path TEXT,
+        canvas_data JSONB,
+        created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    console.log('✅ Tabela "app_templates" criada');
+
     console.log('\n✨ Tabelas criadas! Podes criar users agora.');
   } catch (error) {
     console.error('❌ Erro:', error.message);

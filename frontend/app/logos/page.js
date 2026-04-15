@@ -12,6 +12,7 @@ export default function LogosPage() {
   const [logos, setLogos] = useState([]);
   const [loadingLogos, setLoadingLogos] = useState(true);
   const [error, setError] = useState("");
+  const [deletingLogoId, setDeletingLogoId] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -60,6 +61,33 @@ export default function LogosPage() {
     };
     checkSession();
   }, [router]);
+
+  const handleDeleteLogo = async (logo) => {
+    if (!window.confirm(`Tem a certeza que quer apagar o logo ${logo.name}?`)) {
+      return;
+    }
+
+    try {
+      setDeletingLogoId(logo.id);
+      setError("");
+
+      const response = await fetch(`http://localhost:3001/api/logos/${logo.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Não foi possível apagar o logo");
+      }
+
+      setLogos((prev) => prev.filter((item) => item.id !== logo.id));
+    } catch (err) {
+      setError(err.message || "Erro ao apagar logo");
+    } finally {
+      setDeletingLogoId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -136,6 +164,13 @@ export default function LogosPage() {
                   <p className="text-sm font-semibold text-gray-900">{logo.name}</p>
                   <p className="text-xs text-gray-500 mt-1">Categoria: {logo.category === "audio" ? "Audio" : "Logo"}</p>
                   <p className="text-xs text-gray-500">{logo.createdAt ? new Date(logo.createdAt).toLocaleString("pt-PT") : "-"}</p>
+                  <button
+                    onClick={() => handleDeleteLogo(logo)}
+                    disabled={deletingLogoId === logo.id}
+                    className="mt-3 w-full rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white disabled:bg-red-300"
+                  >
+                    {deletingLogoId === logo.id ? "A apagar..." : "Apagar logo"}
+                  </button>
                 </article>
               ))}
             </div>

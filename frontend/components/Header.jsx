@@ -333,10 +333,6 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                     <div className="p-2">
                       {isAdmin && (
                         <>
-                          <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                            <FaUsers className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-medium">Ver Utilizadores</span>
-                          </Link>
                           <Link href="/templates" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
                             <FaBox className="w-4 h-4 text-gray-500" />
                             <span className="text-sm font-medium">Criar Templates</span>
@@ -346,13 +342,13 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                             <span className="text-sm font-medium">Adicionar Logos</span>
                           </Link>
                           <div className="h-px bg-gray-100 my-1 mx-2" />
+                          <Link href="/admin/users" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+                            <FaUsers className="w-4 h-4 text-gray-500" />
+                            <span className="text-sm font-medium">Ver Utilizadores</span>
+                          </Link>
                           <Link href="/Register" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
                             <FaUserPlus className="w-4 h-4 text-gray-500" />
                             <span className="text-sm font-medium">Criar Utilizador</span>
-                          </Link>
-                          <Link href="/admin" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                           <FaShieldAlt className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-medium">Painel Admin</span>
                           </Link>
                           <div className="h-px bg-gray-100 my-1 mx-2" /> 
                         </>

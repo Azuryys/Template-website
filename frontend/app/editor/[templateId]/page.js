@@ -8,51 +8,17 @@ import { useState, use, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FabricImage } from 'fabric';
 import { FaUndo, FaRedo, FaCopy, FaPaste, FaTrash, FaCog, FaArrowUp, FaArrowDown } from 'react-icons/fa';
+const AUDIO_GROUPS = ['Mint', 'Lavender', 'Peach', 'Lemon', 'Aqua', 'Taffy'];
 
-const logoImages = [
-  { name: 'Default', file: 'Logo_default.png' },
-  { name: 'Black', file: 'Logo_black.png' },
-  { name: 'White', file: 'Logo_white.png' },
-  { name: 'Aqua', file: 'Logo_aqua.png' },
-  { name: 'Lavender', file: 'Logo_lavender.png' },
-  { name: 'Lemon', file: 'Logo_lemon.png' },
-  { name: 'Mint', file: 'Logo_mint.png' },
-  { name: 'Taffy', file: 'Logo_taffy.png' },
-];
-const AudiologoImages = [
-  { name: 'Mint', file: 'Mint.png' },
-  { name: 'Light Mint', file: 'Light_Mint.png' },
-  { name: 'Dark Mint', file: 'Dark_Mint.png' },
-  { name: 'Lavender', file: 'Lavender.png' },
-  { name: 'Light Lavender', file: 'Light_Lavender.png' },
-  { name: 'Dark Lavender', file: 'Dark_Lavender.png' },
-  { name: 'Peach', file: 'Peach.png' },
-  { name: 'Light Peach', file: 'Light_Peach.png' },
-  { name: 'Dark Peach', file: 'Dark_Peach.png' },
-  { name: 'Lemon', file: 'Lemon.png' },
-  { name: 'Light Lemon', file: 'Light_Lemon.png' },
-  { name: 'Dark Lemon', file: 'Dark_Lemon.png' },
-  { name: 'Aqua', file: 'Aqua.png' },
-  { name: 'Light Aqua', file: 'Light_Aqua.png' },
-  { name: 'Dark Aqua', file: 'Dark_Aqua.png' },
-  { name: 'Taffy', file: 'Taffy.png' },
-  { name: 'Light Taffy', file: 'Light_Taffy.png' },
-  { name: 'Dark Taffy', file: 'Dark_Taffy.png' },
-];
-
-const colorGroups = {
-  Mint:     ['Mint', 'Light Mint', 'Dark Mint'],
-  Lavender: ['Lavender', 'Light Lavender', 'Dark Lavender'],
-  Peach:    ['Peach', 'Light Peach', 'Dark Peach'],
-  Lemon:    ['Lemon', 'Light Lemon', 'Dark Lemon'],
-  Aqua:     ['Aqua', 'Light Aqua', 'Dark Aqua'],
-  Taffy:    ['Taffy', 'Light Taffy', 'Dark Taffy'],
-};
-
-function AudioLogoMenu({ handleAddAudioLogo }) {
+function AudioLogoMenu({ audioLogos, handleAddAudioLogo }) {
   const [openColor, setOpenColor] = useState(null);
 
-  const findLogo = (name) => AudiologoImages.find((l) => l.name === name);
+  const groupAudioLogos = useMemo(() => {
+    return AUDIO_GROUPS.map((groupName) => ({
+      groupName,
+      variants: audioLogos.filter((logo) => logo.name.toLowerCase().includes(groupName.toLowerCase())),
+    })).filter((group) => group.variants.length > 0);
+  }, [audioLogos]);
 
   return (
     <div className="relative">
@@ -63,38 +29,35 @@ function AudioLogoMenu({ handleAddAudioLogo }) {
         </button>
 
         {/* Color list */}
-        <div className="absolute left-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 py-1">
-          {Object.entries(colorGroups).map(([color, variants]) => (
+        <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 py-1 max-h-[420px] overflow-y-auto">
+          {groupAudioLogos.map(({ groupName, variants }) => (
             <div
-              key={color}
-              className="relative"
-              onMouseEnter={() => setOpenColor(color)}
-              onMouseLeave={() => setOpenColor(null)}
+              key={groupName}
+              className="border-b border-gray-100 last:border-b-0"
             >
-              {/* Color row */}
-              <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between transition-colors">
-                <span>{color}</span>
+              <button
+                onClick={() => setOpenColor((prev) => (prev === groupName ? null : groupName))}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between transition-colors"
+              >
+                <span>{groupName}</span>
                 <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
 
-              {/* Variants submenu */}
-              {openColor === color && (
-                <div className="absolute left-full top-0 ml-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2">
+              {openColor === groupName && (
+                <div className="px-3 pb-3">
                   <div className="grid grid-cols-1 gap-1">
-                    {variants.map((variantName) => {
-                      const logo = findLogo(variantName);
-                      if (!logo) return null;
+                    {variants.map((logo) => {
                       return (
                         <button
-                          key={logo.file}
-                          onClick={() => handleAddAudioLogo(logo.file)}
+                          key={logo.id}
+                          onClick={() => handleAddAudioLogo(logo.filePath)}
                           className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors text-left"
                         >
                           <div className="w-10 h-10 flex items-center justify-center bg-gray-50 rounded border border-gray-100">
                             <img
-                              src={`/BauerImages/Logo_Audio/${logo.file}`}
+                              src={logo.filePath}
                               alt={logo.name}
                               className="max-h-8 max-w-full object-contain"
                             />
@@ -212,6 +175,7 @@ export default function EditorPage({ params }) {
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [canvasActions, setCanvasActions] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [logoLibrary, setLogoLibrary] = useState([]);
   const [hotkeys, setHotkeys] = useState({
     undo: { ctrl: true, key: 'z' },
     redo: { ctrl: true, key: 'y' },
@@ -226,12 +190,72 @@ export default function EditorPage({ params }) {
   const [recentImages, setRecentImages] = useState([]);
   const pendingPlaceholderRef = useRef(null);
 
+  const logoImages = useMemo(
+    () => logoLibrary.filter((item) => item.category === 'logo'),
+    [logoLibrary]
+  );
+
+  const audioLogoImages = useMemo(
+    () => logoLibrary.filter((item) => item.category === 'audio'),
+    [logoLibrary]
+  );
+
+  useEffect(() => {
+    const loadLogoLibrary = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/logos', {
+          credentials: 'include',
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'Falha ao carregar logos');
+        }
+
+        setLogoLibrary(Array.isArray(data.logos) ? data.logos : []);
+      } catch (error) {
+        console.error('Error loading logo library:', error);
+        setLogoLibrary([]);
+      }
+    };
+
+    loadLogoLibrary();
+  }, []);
+
+  const fetchSavedTemplates = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/templates', {
+        credentials: 'include',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Falha ao carregar templates guardados');
+      }
+
+      const templates = Array.isArray(data.templates) ? data.templates : [];
+      setSavedTemplates(templates);
+
+      try {
+        localStorage.setItem('savedTemplates', JSON.stringify(templates));
+      } catch (storageError) {
+        console.error('Error caching saved templates locally:', storageError);
+      }
+    } catch (error) {
+      console.error('Error loading saved templates from backend:', error);
+
+      try {
+        const fallbackTemplates = JSON.parse(localStorage.getItem('savedTemplates') || '[]');
+        setSavedTemplates(fallbackTemplates);
+      } catch (storageError) {
+        console.error('Error loading fallback saved templates:', storageError);
+      }
+    }
+  }, []);
+
   // Load saved templates, hotkeys, and recent images from localStorage
   useEffect(() => {
     try {
-      const templates = JSON.parse(localStorage.getItem('savedTemplates') || '[]');
-      setSavedTemplates(templates);
-      
       const savedHotkeys = JSON.parse(localStorage.getItem('canvasHotkeys') || '{}');
       if (Object.keys(savedHotkeys).length > 0) {
         setHotkeys(savedHotkeys);
@@ -244,6 +268,8 @@ export default function EditorPage({ params }) {
     } catch (error) {
       console.error('Error loading saved data:', error);
     }
+
+    fetchSavedTemplates();
   }, []);
 
   // Helper function to format hotkey for display
@@ -358,7 +384,7 @@ export default function EditorPage({ params }) {
     }
   };
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
     if (!templateName.trim()) {
       alert('Please enter a template name');
       return;
@@ -372,24 +398,30 @@ export default function EditorPage({ params }) {
     try {
       // Get canvas data as JSON
       const canvasData = canvas.toJSON();
-      
-      // Create template object with sourceTemplateId for categorization
-      const newTemplate = {
-        id: `custom-${Date.now()}`,
-        name: templateName,
-        width: template.width,
-        height: template.height,
-        description: `Custom template created from ${template.name}`,
-        canvasData: canvasData,
-        createdAt: new Date().toISOString(),
-        sourceTemplateId: templateId, // Store the original template category
-      };
 
-      // Save to localStorage
-      const currentSavedTemplates = JSON.parse(localStorage.getItem('savedTemplates') || '[]');
-      currentSavedTemplates.push(newTemplate);
-      localStorage.setItem('savedTemplates', JSON.stringify(currentSavedTemplates));
-      setSavedTemplates(currentSavedTemplates);
+      const response = await fetch('http://localhost:3001/api/templates', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: templateName,
+          description: `Custom template created from ${template.name}`,
+          width: template.width,
+          height: template.height,
+          canvasData,
+          sourceTemplateId: templateId,
+          templateType: 'canvas',
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to save template');
+      }
+
+      await fetchSavedTemplates();
 
       // Reset modal
       setShowSaveModal(false);
@@ -558,8 +590,7 @@ export default function EditorPage({ params }) {
 
   const handleAddLogo = (file) => {
     if (!canvas) return;
-    const url = `/BauerImages/Logo/${file}`;
-    FabricImage.fromURL(url, { crossOrigin: 'anonymous' }).then((img) => {
+    FabricImage.fromURL(file, { crossOrigin: 'anonymous' }).then((img) => {
       const placement = template.logo ?? { widthRatio: 0.20, leftRatio: 0.06, topRatio: 0.05 };
       const logoWidth = canvas.width * placement.widthRatio;
       const scale = logoWidth / img.width;
@@ -576,8 +607,7 @@ export default function EditorPage({ params }) {
 
   const handleAddAudioLogo = (file) => {
     if (!canvas) return;
-    const url = `/BauerImages/Logo_Audio/${file}`;
-    FabricImage.fromURL(url, { crossOrigin: 'anonymous' }).then((img) => {
+    FabricImage.fromURL(file, { crossOrigin: 'anonymous' }).then((img) => {
       const placement = template.audioLogo ?? { 
         widthRatio: 0.20,        // base reference size
         leftRatio: 0.06, 
@@ -667,13 +697,13 @@ export default function EditorPage({ params }) {
                 <div className="p-2 grid grid-cols-2 gap-2">
                   {logoImages.map((logo) => (
                     <button
-                      key={logo.file}
-                      onClick={() => handleAddLogo(logo.file)}
+                      key={logo.id}
+                      onClick={() => handleAddLogo(logo.filePath)}
                       className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200"
                     >
                       <div className="w-full h-16 flex items-center justify-center bg-gray-50 rounded">
                         <img
-                          src={`/BauerImages/Logo/${logo.file}`}
+                          src={logo.filePath}
                           alt={logo.name}
                           className="max-h-14 max-w-full object-contain"
                         />
@@ -686,7 +716,7 @@ export default function EditorPage({ params }) {
             </div>
 
             {/* Audio Logo Menu */}
-            <AudioLogoMenu handleAddAudioLogo={handleAddAudioLogo} />
+            <AudioLogoMenu audioLogos={audioLogoImages} handleAddAudioLogo={handleAddAudioLogo} />
             
             {/* Content Menu */}
             <ContentMenu 

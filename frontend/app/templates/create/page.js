@@ -7,47 +7,48 @@ import { FaArrowLeft, FaCheckCircle } from "react-icons/fa";
 import Header from "@/components/Header";
 import { authClient } from "@/lib/auth-client";
 
-export default function CreateLogoPage() {
+export default function CreateTemplatePage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingLibrary, setLoadingLibrary] = useState(true);
   const [library, setLibrary] = useState([]);
-  const [category, setCategory] = useState("logo");
-  const [selectedLogo, setSelectedLogo] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadName, setUploadName] = useState("");
+  const [uploadDescription, setUploadDescription] = useState("");
   const router = useRouter();
 
-  // Carrega os ficheiros reais das pastas Logo e Logo_Audio.
+  // Carrega os ficheiros reais da pasta Templates.
   const loadLibrary = async () => {
     try {
       setLoadingLibrary(true);
       setError("");
 
-      const response = await fetch("http://localhost:3001/api/logos/library", {
+      const response = await fetch("http://localhost:3001/api/templates/library", {
         credentials: "include",
       });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || "Falha ao carregar biblioteca de logos");
+        throw new Error(data?.error || "Falha ao carregar biblioteca de templates");
       }
 
-      setLibrary(data.logos || []);
+      setLibrary(data.templates || []);
     } catch (err) {
-      setError(err.message || "Erro ao carregar biblioteca de logos");
+      setError(err.message || "Erro ao carregar biblioteca de templates");
     } finally {
       setLoadingLibrary(false);
     }
   };
 
   useEffect(() => {
-    // Garante que apenas admin/superadmin entra na pagina de criar logos.
+    // Garante que apenas admin/superadmin entra na pagina de criar templates.
     const checkSession = async () => {
       try {
         const { data: session } = await authClient.getSession();
@@ -74,30 +75,20 @@ export default function CreateLogoPage() {
     checkSession();
   }, [router]);
 
-  const filteredLogos = useMemo(
-    () => library.filter((item) => item.category === category),
-    [library, category]
-  );
-
-  useEffect(() => {
-    // Se trocar de categoria, limpa a selecao antiga para evitar incoerencia.
-    if (!selectedLogo || selectedLogo.category !== category) {
-      setSelectedLogo(null);
-      setName("");
-    }
-  }, [category, selectedLogo]);
-
   // Seleciona um ficheiro da biblioteca para guardar na base de dados.
-  const handleSelectLogo = (logo) => {
-    setSelectedLogo(logo);
+  const handleSelectTemplate = (template) => {
+    setSelectedTemplate(template);
     setError("");
     setSuccess("");
     if (!name) {
-      setName(logo.name);
+      setName(template.name);
+    }
+    if (!description) {
+      setDescription(template.description || "");
     }
   };
 
-  // Faz upload de um novo ficheiro logo para a biblioteca.
+  // Faz upload de um novo ficheiro template para a biblioteca.
   const handleUploadFile = async (event) => {
     event.preventDefault();
 
@@ -107,7 +98,7 @@ export default function CreateLogoPage() {
     }
 
     if (!uploadName.trim()) {
-      setError("Defina um nome para o logo.");
+      setError("Defina um nome para o template.");
       return;
     }
 
@@ -119,51 +110,45 @@ export default function CreateLogoPage() {
       const formData = new FormData();
       formData.append("file", uploadFile);
       formData.append("name", uploadName.trim());
-      formData.append("category", category);
+      formData.append("description", uploadDescription.trim());
 
-      const response = await fetch("http://localhost:3001/api/logos/upload", {
+      const response = await fetch("http://localhost:3001/api/templates/upload", {
         method: "POST",
         credentials: "include",
         body: formData,
       });
-      const contentType = response.headers.get("content-type") || "";
-      const data = contentType.includes("application/json")
-        ? await response.json()
-        : { error: "Resposta inválida do servidor de upload" };
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || "Não foi possível fazer upload do logo");
+        throw new Error(data?.error || "Não foi possível fazer upload do template");
       }
 
-      setSuccess("Logo enviado com sucesso!");
-      if (data?.logo) {
-        setSelectedLogo(data.logo);
-        setName(data.logo.name || uploadName.trim());
-      }
+      setSuccess("Template enviado com sucesso!");
       setUploadFile(null);
       setUploadName("");
+      setUploadDescription("");
       await loadLibrary();
       setTimeout(() => {
         setSuccess("");
       }, 2000);
     } catch (err) {
-      setError(err.message || "Erro ao fazer upload do logo");
+      setError(err.message || "Erro ao fazer upload do template");
     } finally {
       setUploadingFile(false);
     }
   };
 
-  // Cria/atualiza o registo do logo na base de dados.
+  // Cria/atualiza o registo do template na base de dados.
   const handleSave = async (event) => {
     event.preventDefault();
 
-    if (!selectedLogo) {
-      setError("Selecione um logo antes de guardar.");
+    if (!selectedTemplate) {
+      setError("Selecione um template antes de guardar.");
       return;
     }
 
     if (!name.trim()) {
-      setError("Defina um nome para o logo.");
+      setError("Defina um nome para o template.");
       return;
     }
 
@@ -172,7 +157,7 @@ export default function CreateLogoPage() {
       setError("");
       setSuccess("");
 
-      const response = await fetch("http://localhost:3001/api/logos", {
+      const response = await fetch("http://localhost:3001/api/templates", {
         method: "POST",
         credentials: "include",
         headers: {
@@ -180,22 +165,22 @@ export default function CreateLogoPage() {
         },
         body: JSON.stringify({
           name: name.trim(),
-          category: selectedLogo.category,
-          filePath: selectedLogo.filePath,
+          description: description.trim(),
+          filePath: selectedTemplate.filePath,
         }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || "Nao foi possivel guardar o logo");
+        throw new Error(data?.error || "Não foi possível guardar o template");
       }
 
-      setSuccess("Logo guardado com sucesso.");
+      setSuccess("Template guardado com sucesso.");
       setTimeout(() => {
-        router.push("/logos");
+        router.push("/templates");
       }, 900);
     } catch (err) {
-      setError(err.message || "Erro ao guardar logo");
+      setError(err.message || "Erro ao guardar template");
     } finally {
       setSaving(false);
     }
@@ -224,47 +209,44 @@ export default function CreateLogoPage() {
 
       <main className="pt-20 px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="mb-8">
-          <Link href="/logos" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 w-fit">
+          <Link href="/templates" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 w-fit">
             <FaArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Voltar para logos</span>
+            <span className="text-sm">Voltar para templates</span>
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Criar Logo</h1>
-          <p className="text-gray-600 mt-2">Escolhe um ficheiro existente e guarda-o na base de dados.</p>
+          <h1 className="text-3xl font-bold text-gray-900">Criar Template</h1>
+          <p className="text-gray-600 mt-2">Faça upload de um novo arquivo ou escolha um existente.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
           <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="mb-8 pb-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Fazer Upload de Novo Logo</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Fazer Upload de Novo Template</h2>
               <form onSubmit={handleUploadFile} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Nome</label>
-                    <input
-                      type="text"
-                      value={uploadName}
-                      onChange={(e) => setUploadName(e.target.value)}
-                      placeholder="Ex: Logo Novo"
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Pasta</label>
-                    <select
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white"
-                    >
-                      <option value="logo">Pasta Logo</option>
-                      <option value="audio">Pasta Logo_Audio</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+                  <input
+                    type="text"
+                    value={uploadName}
+                    onChange={(e) => setUploadName(e.target.value)}
+                    placeholder="Ex: Template Banner 1920x1080"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ficheiro de Imagem</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Descrição (Opcional)</label>
+                  <textarea
+                    value={uploadDescription}
+                    onChange={(e) => setUploadDescription(e.target.value)}
+                    placeholder="Ex: Template para banners de 1920x1080"
+                    rows={3}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ficheiro (JSON/SVG)</label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept=".json,.svg"
                     onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-900 file:px-3 file:py-1.5 file:text-sm file:text-white file:font-medium"
                   />
@@ -274,45 +256,31 @@ export default function CreateLogoPage() {
                   disabled={uploadingFile || !uploadFile}
                   className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white disabled:bg-blue-400 hover:bg-blue-700"
                 >
-                  {uploadingFile ? "A enviar..." : "Enviar Logo"}
+                  {uploadingFile ? "A enviar..." : "Enviar Template"}
                 </button>
               </form>
             </div>
 
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Ou Selecione da Biblioteca</h2>
-            <div className="flex flex-wrap gap-2 mb-5">
-              <button
-                onClick={() => setCategory("logo")}
-                className={`rounded-md px-3 py-2 text-sm font-medium ${category === "logo" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}
-              >
-                Pasta Logo
-              </button>
-              <button
-                onClick={() => setCategory("audio")}
-                className={`rounded-md px-3 py-2 text-sm font-medium ${category === "audio" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700"}`}
-              >
-                Pasta Logo_Audio
-              </button>
-            </div>
 
             {loadingLibrary ? (
               <p className="text-gray-500">A carregar biblioteca...</p>
-            ) : filteredLogos.length === 0 ? (
-              <p className="text-gray-500">Nao foram encontrados ficheiros nesta pasta.</p>
+            ) : library.length === 0 ? (
+              <p className="text-gray-500">Não foram encontrados templates na biblioteca.</p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                {filteredLogos.map((logo) => {
-                  const isSelected = selectedLogo?.id === logo.id;
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {library.map((template) => {
+                  const isSelected = selectedTemplate?.id === template.id;
                   return (
                     <button
-                      key={logo.id}
-                      onClick={() => handleSelectLogo(logo)}
-                      className={`rounded-lg border p-3 text-left transition ${isSelected ? "border-green-500 bg-green-50" : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}
+                      key={template.id}
+                      onClick={() => handleSelectTemplate(template)}
+                      className={`rounded-lg border p-4 text-left transition ${isSelected ? "border-green-500 bg-green-50" : "border-gray-200 bg-gray-50 hover:border-gray-300"}`}
                     >
-                      <div className="h-16 rounded-md bg-white border border-gray-200 flex items-center justify-center p-2 mb-2">
-                        <img src={logo.filePath} alt={logo.name} className="max-h-full max-w-full object-contain" />
-                      </div>
-                      <p className="text-xs font-medium text-gray-800 truncate">{logo.name}</p>
+                      <p className="font-medium text-gray-800 truncate">{template.name}</p>
+                      {template.description && (
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">{template.description}</p>
+                      )}
                     </button>
                   );
                 })}
@@ -322,34 +290,31 @@ export default function CreateLogoPage() {
 
           <aside className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
             <form onSubmit={handleSave} className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900">Dados do logo</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Dados do Template</h2>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Logo Mint Principal"
+                  placeholder="Ex: Banner Principal"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição (Opcional)</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Descreva o template"
+                  rows={3}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
                 />
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
-                <div className="mb-3 rounded-md border border-gray-200 bg-white p-2">
-                  {selectedLogo?.filePath ? (
-                    <img
-                      src={selectedLogo.filePath}
-                      alt={selectedLogo.name || "Logo selecionado"}
-                      className="h-28 w-full object-contain"
-                    />
-                  ) : (
-                    <div className="flex h-28 items-center justify-center text-sm text-gray-400">
-                      Nenhuma logo selecionada
-                    </div>
-                  )}
-                </div>
-                <p><strong>Categoria:</strong> {selectedLogo?.category || "-"}</p>
-                <p className="mt-1 break-all"><strong>Ficheiro:</strong> {selectedLogo?.filePath || "-"}</p>
+                <p className="break-all"><strong>Ficheiro:</strong> {selectedTemplate?.filePath || "-"}</p>
               </div>
 
               {error && (
@@ -367,10 +332,10 @@ export default function CreateLogoPage() {
 
               <button
                 type="submit"
-                disabled={saving || !selectedLogo}
+                disabled={saving || !selectedTemplate}
                 className="w-full rounded-md bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white disabled:bg-gray-400"
               >
-                {saving ? "A guardar..." : "Guardar logo"}
+                {saving ? "A guardar..." : "Guardar Template"}
               </button>
             </form>
           </aside>

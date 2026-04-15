@@ -21,9 +21,19 @@ export default function AdminPage() {
   const router = useRouter();
   const currentRole = user?.role || user?.usertype || 'user';
   const currentUserIsSuperAdmin = currentRole === 'superadmin';
-  const displayedUsers = currentUserIsSuperAdmin
-    ? users
-    : users.filter((listedUser) => !listedUser.isSuperAdmin);
+  const currentUserIsAdmin = currentRole === 'admin';
+  const displayedUsers = users.filter((listedUser) => {
+    const isCurrentUser = listedUser.id === user?.id;
+    if (isCurrentUser) {
+      return false;
+    }
+
+    if (!currentUserIsSuperAdmin && listedUser.isSuperAdmin) {
+      return false;
+    }
+
+    return true;
+  });
 
   // Carrega os utilizadores para o painel admin.
   const fetchUsers = async () => {
@@ -189,8 +199,6 @@ export default function AdminPage() {
       />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Painel de Administração</h1>
-
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
             <p className="text-gray-600">Bem-vindo, {user?.name || user?.email}!</p>
@@ -230,7 +238,7 @@ export default function AdminPage() {
                     const isCurrentUser = listedUser.id === user.id;
                     const isProtectedByRole = listedUser.isAdmin && !currentUserIsSuperAdmin;
                     const deleteBlocked = isCurrentUser || isProtectedByRole || deletingUserId === listedUser.id;
-                    const reportBlockedByRole = currentUserIsSuperAdmin && listedUser.isSuperAdmin;
+                    const canReportUser = listedUser.isAdmin && currentUserIsAdmin && !currentUserIsSuperAdmin && !isCurrentUser;
                     const roleLabel = listedUser.isSuperAdmin ? 'superadmin' : (listedUser.isAdmin ? 'admin' : 'user');
                     return (
                       <tr key={listedUser.id} className="border-b border-gray-100">
@@ -247,16 +255,11 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="py-3">
-                          {listedUser.isAdmin && !reportBlockedByRole && (
+                          {canReportUser && (
                             <button
                               onClick={() => openReportModal(listedUser)}
-                              disabled={isCurrentUser}
-                              className="mr-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
-                              title={
-                                isCurrentUser
-                                  ? 'Não pode reportar a sua própria conta'
-                                  : 'Reportar admin'
-                              }
+                              className="mr-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700"
+                              title="Reportar admin"
                             >
                               Reportar
                             </button>
