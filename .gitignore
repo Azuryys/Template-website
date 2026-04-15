@@ -5,30 +5,16 @@ docker-compose.yml
  
 # Environment variables
 .env
-*/.env
+
  
 # Dependencies
 node_modules
-*/node_modules
+
  
 # Next.js
 .next
  
 # Logs
 *.log
-=======
 
-# Environment variables
-.env
-*/.env
-
-# Dependencies
-node_modules
-*/node_modules
-
-# Next.js
-.next
-
-# Logs
-*.log
 
