@@ -333,10 +333,10 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                     <div className="p-2">
                       {isAdmin && (
                         <>
-                          <Link href="/templates" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-                            <FaBox className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm font-medium">Criar Templates</span>
-                          </Link>
+                          
+                            {/*<FaBox className="w-4 h-4 text-gray-500" />*/}
+                            {/* <span className="text-sm font-medium">Criar Templates</span> */}
+                          
                           <Link href="/logos" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200">
                             <FaImage className="w-4 h-4 text-gray-500" />
                             <span className="text-sm font-medium">Adicionar Logos</span>

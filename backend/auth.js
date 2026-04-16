@@ -1,11 +1,8 @@
 import { betterAuth } from "better-auth";
-import { Resend } from "resend";
 import { pool } from "./src/server/lib/db.js";
 import { ENV } from "./src/config/env.js";
 import { ResetPassword } from "./src/emails/ResetPassword.js";
-
-const resend = ENV.RESEND_API_KEY ? new Resend(ENV.RESEND_API_KEY) : null;
-const FROM_EMAIL = ENV.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+import { sendPasswordResetEmail } from "./src/lib/sendgrid.js";
 
 export const auth = betterAuth({
     // ✅ FORMA CORRETA - passa o pool direto
@@ -78,19 +75,19 @@ export const auth = betterAuth({
         sendResetPassword: async ({ user, url }) => {
             const name = user.name || user.email.split("@")[0];
 
-            if (!resend) {
-                console.warn(`Resend API key ausente. Reset password não enviado para ${user.email}`);
-                return;
+            try {
+                await sendPasswordResetEmail({
+                    to: user.email,
+                    name,
+                    url,
+                    htmlTemplate: ResetPassword({ name, url }),
+                });
+                
+                console.log(`✅ Reset enviado para ${user.email}`);
+            } catch (error) {
+                console.error(`❌ Erro ao enviar reset password para ${user.email}:`, error);
+                throw error;
             }
-
-            await resend.emails.send({
-                from: FROM_EMAIL,
-                to: user.email,
-                subject: "Recuperação de Password",
-                html: ResetPassword({ name, url }),
-            });
-            
-            console.log(`Reset enviado para ${user.email}`);
         },
     },
 

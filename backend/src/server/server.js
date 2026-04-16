@@ -10,6 +10,7 @@ import multer from 'multer';
 import 'dotenv/config';
 import { auth } from '../../auth.js';
 import { pool } from './lib/db.js';  // ← importa Pool do db.js (conexão com PostgreSQL)
+import { sendRecoveryCodeEmail, sendTestEmail } from '../lib/sendgrid.js';
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
 import { hashPassword } from 'better-auth/crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -103,8 +104,8 @@ async function readLogoLibrary() {
 }
 
 function getLogoFolderFromCategory(category) {
-  const config = LOGO_LIBRARY_CONFIG.find((item) => item.category === category);
-  return config?.folder || null;
+  const config = LOGO_LIBRARY_CONFIG.find((c) => c.category === category);
+  return config ? config.folder : null;
 }
 
 function normalizeTemplateFileExtension(file) {
@@ -342,6 +343,186 @@ app.get('/api/logos/library', async (req, res) => {
   }
 });
 
+// Faz upload de um novo ficheiro para a biblioteca de logos no frontend/public.
+app.post('/api/logos/upload', (req, res) => {
+  logoUpload.single('file')(req, res, async (uploadError) => {
+    if (uploadError) {
+      const message = uploadError.code === 'LIMIT_FILE_SIZE'
+        ? 'Ficheiro demasiado grande (máx 5MB)'
+        : 'Erro ao processar upload';
+      return res.status(400).json({ error: message });
+    }
+
+    try {
+      const session = await requireAdminSession(req, res);
+      if (!session) return;
+
+      const normalizedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+      const normalizedCategory = typeof req.body?.category === 'string' ? req.body.category.trim().toLowerCase() : '';
+      const targetFolder = getLogoFolderFromCategory(normalizedCategory);
+
+      if (!normalizedName) {
+        return res.status(400).json({ error: 'Nome é obrigatório' });
+      }
+
+      if (!targetFolder) {
+        return res.status(400).json({ error: 'Categoria inválida' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Ficheiro é obrigatório' });
+      }
+
+      const extension = normalizeImageExtension(req.file);
+      if (!extension) {
+        return res.status(400).json({ error: 'Formato inválido. Use PNG, JPG, WEBP ou SVG' });
+      }
+
+      const safeBase = toSafeFileBaseName(normalizedName);
+      const fileName = `${safeBase}_${Date.now()}.${extension}`;
+      const folderPath = join(BAUER_IMAGES_ROOT, targetFolder);
+      const filePathOnDisk = join(folderPath, fileName);
+
+      await mkdir(folderPath, { recursive: true });
+      await writeFile(filePathOnDisk, req.file.buffer);
+
+      const publicPath = `/BauerImages/${targetFolder}/${fileName}`;
+      res.status(201).json({
+        message: 'Upload concluído',
+        logo: {
+          id: `${normalizedCategory}-${fileName}`,
+          name: normalizedName,
+          fileName,
+          filePath: publicPath,
+          category: normalizedCategory,
+        },
+      });
+    } catch (error) {
+      console.error('Erro no upload de logo:', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    }
+  });
+});
+
+// Lista logos que ja foram guardados na base de dados.
+app.get('/api/logos', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const result = await pool.query(
+      `SELECT id, name, category, file_path, created_by, created_at
+       FROM app_logos
+       ORDER BY created_at DESC`
+    );
+
+    const logos = result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      filePath: row.file_path,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+    }));
+
+    res.json({ logos });
+  } catch (error) {
+    console.error('Erro ao listar logos:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Cria ou atualiza um logo na base de dados usando ficheiro ja existente.
+app.post('/api/logos', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const { name, category, filePath } = req.body;
+    const normalizedName = typeof name === 'string' ? name.trim() : '';
+    const normalizedCategory = typeof category === 'string' ? category.trim().toLowerCase() : '';
+    const normalizedPath = typeof filePath === 'string' ? filePath.trim() : '';
+
+    if (!normalizedName) {
+      return res.status(400).json({ error: 'Nome é obrigatório' });
+    }
+
+    if (!['logo', 'audio'].includes(normalizedCategory)) {
+      return res.status(400).json({ error: 'Categoria inválida' });
+    }
+
+    if (!normalizedPath.startsWith('/BauerImages/')) {
+      return res.status(400).json({ error: 'Caminho do logo inválido' });
+    }
+
+    const library = await readLogoLibrary();
+    const fileExistsInLibrary = library.some(
+      (item) => item.category === normalizedCategory && item.filePath === normalizedPath
+    );
+
+    if (!fileExistsInLibrary) {
+      return res.status(400).json({ error: 'Logo não encontrado nas pastas da app' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO app_logos (name, category, file_path, created_by)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (category, file_path)
+       DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name, category, file_path, created_by, created_at`,
+      [normalizedName, normalizedCategory, normalizedPath, session.user.id]
+    );
+
+    const row = result.rows[0];
+    res.status(201).json({
+      logo: {
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        filePath: row.file_path,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao criar logo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Remove logo guardado da base de dados.
+app.delete('/api/logos/:id', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const logoId = req.params.id;
+    if (!logoId) {
+      return res.status(400).json({ error: 'ID do logo é obrigatório' });
+    }
+
+    const result = await pool.query(
+      `DELETE FROM app_logos
+       WHERE id = $1
+       RETURNING id`,
+      [logoId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Logo não encontrado' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao apagar logo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// ============================================
+// TEMPLATES - ENDPOINTS
+// ============================================
+
 // Devolve os templates estáticos disponíveis para começar um novo layout.
 app.get('/api/templates/library', async (req, res) => {
   try {
@@ -568,182 +749,6 @@ app.post('/api/templates/upload', (req, res) => {
       res.status(500).json({ error: 'Erro interno do servidor' });
     }
   });
-});
-
-// Faz upload de um novo ficheiro para a biblioteca de logos no frontend/public.
-app.post('/api/logos/upload', (req, res) => {
-  logoUpload.single('file')(req, res, async (uploadError) => {
-    if (uploadError) {
-      const message = uploadError.code === 'LIMIT_FILE_SIZE'
-        ? 'Ficheiro demasiado grande (máx 5MB)'
-        : 'Erro ao processar upload';
-      return res.status(400).json({ error: message });
-    }
-
-    try {
-      const session = await requireAdminSession(req, res);
-      if (!session) return;
-
-      const normalizedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-      const normalizedCategory = typeof req.body?.category === 'string' ? req.body.category.trim().toLowerCase() : '';
-      const targetFolder = getLogoFolderFromCategory(normalizedCategory);
-
-      if (!normalizedName) {
-        return res.status(400).json({ error: 'Nome é obrigatório' });
-      }
-
-      if (!targetFolder) {
-        return res.status(400).json({ error: 'Categoria inválida' });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ error: 'Ficheiro é obrigatório' });
-      }
-
-      const extension = normalizeImageExtension(req.file);
-      if (!extension) {
-        return res.status(400).json({ error: 'Formato inválido. Use PNG, JPG, WEBP ou SVG' });
-      }
-
-      const safeBase = toSafeFileBaseName(normalizedName);
-      const fileName = `${safeBase}_${Date.now()}.${extension}`;
-      const folderPath = join(BAUER_IMAGES_ROOT, targetFolder);
-      const filePathOnDisk = join(folderPath, fileName);
-
-      await mkdir(folderPath, { recursive: true });
-      await writeFile(filePathOnDisk, req.file.buffer);
-
-      const publicPath = `/BauerImages/${targetFolder}/${fileName}`;
-      res.status(201).json({
-        message: 'Upload concluído',
-        logo: {
-          id: `${normalizedCategory}-${fileName}`,
-          name: normalizedName,
-          fileName,
-          filePath: publicPath,
-          category: normalizedCategory,
-        },
-      });
-    } catch (error) {
-      console.error('Erro no upload de logo:', error);
-      res.status(500).json({ error: 'Erro interno do servidor' });
-    }
-  });
-});
-
-// Lista logos que ja foram guardados na base de dados.
-app.get('/api/logos', async (req, res) => {
-  try {
-    const session = await requireAdminSession(req, res);
-    if (!session) return;
-
-    const result = await pool.query(
-      `SELECT id, name, category, file_path, created_by, created_at
-       FROM app_logos
-       ORDER BY created_at DESC`
-    );
-
-    const logos = result.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      category: row.category,
-      filePath: row.file_path,
-      createdBy: row.created_by,
-      createdAt: row.created_at,
-    }));
-
-    res.json({ logos });
-  } catch (error) {
-    console.error('Erro ao listar logos:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Cria ou atualiza um logo na base de dados usando ficheiro ja existente.
-app.post('/api/logos', async (req, res) => {
-  try {
-    const session = await requireAdminSession(req, res);
-    if (!session) return;
-
-    const { name, category, filePath } = req.body;
-    const normalizedName = typeof name === 'string' ? name.trim() : '';
-    const normalizedCategory = typeof category === 'string' ? category.trim().toLowerCase() : '';
-    const normalizedPath = typeof filePath === 'string' ? filePath.trim() : '';
-
-    if (!normalizedName) {
-      return res.status(400).json({ error: 'Nome é obrigatório' });
-    }
-
-    if (!['logo', 'audio'].includes(normalizedCategory)) {
-      return res.status(400).json({ error: 'Categoria inválida' });
-    }
-
-    if (!normalizedPath.startsWith('/BauerImages/')) {
-      return res.status(400).json({ error: 'Caminho do logo inválido' });
-    }
-
-    const library = await readLogoLibrary();
-    const fileExistsInLibrary = library.some(
-      (item) => item.category === normalizedCategory && item.filePath === normalizedPath
-    );
-
-    if (!fileExistsInLibrary) {
-      return res.status(400).json({ error: 'Logo não encontrado nas pastas da app' });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO app_logos (name, category, file_path, created_by)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (category, file_path)
-       DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, name, category, file_path, created_by, created_at`,
-      [normalizedName, normalizedCategory, normalizedPath, session.user.id]
-    );
-
-    const row = result.rows[0];
-    res.status(201).json({
-      logo: {
-        id: row.id,
-        name: row.name,
-        category: row.category,
-        filePath: row.file_path,
-        createdBy: row.created_by,
-        createdAt: row.created_at,
-      },
-    });
-  } catch (error) {
-    console.error('Erro ao criar logo:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
-});
-
-// Remove logo guardado da base de dados.
-app.delete('/api/logos/:id', async (req, res) => {
-  try {
-    const session = await requireAdminSession(req, res);
-    if (!session) return;
-
-    const logoId = req.params.id;
-    if (!logoId) {
-      return res.status(400).json({ error: 'ID do logo é obrigatório' });
-    }
-
-    const result = await pool.query(
-      `DELETE FROM app_logos
-       WHERE id = $1
-       RETURNING id`,
-      [logoId]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Logo não encontrado' });
-    }
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erro ao apagar logo:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
-  }
 });
 
 // Cria um report de admin para analise do superadmin.
@@ -1057,10 +1062,12 @@ app.post('/api/password/recover', async (req, res) => {
     }
 
     // Verificação: email deve existir na tabela user (usuário registado)
-    const userResult = await pool.query('SELECT id FROM "user" WHERE email = $1', [email]);
+    const userResult = await pool.query('SELECT id, name, email FROM "user" WHERE email = $1', [email]);
     if (userResult.rows.length === 0) {
       return res.status(400).json({ error: 'Email não existe' });
     }
+
+    const user = userResult.rows[0];
 
     // Gera um código aleatório de 6 dígitos (100000-999999)
     const recoveryCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -1071,6 +1078,13 @@ app.post('/api/password/recover', async (req, res) => {
        VALUES ($1, $2, FALSE, NOW() + INTERVAL '1 hour')`,
       [email, recoveryCode]
     );
+
+    // Envia o código por email via SendGrid
+    await sendRecoveryCodeEmail({
+      to: user.email,
+      name: user.name || user.email.split('@')[0],
+      code: recoveryCode,
+    });
 
     // Log para debug - mostra o email e código gerado no console
     console.log(`📧 EMAIL: ${email} | 🔑 CÓDIGO: ${recoveryCode}`);
@@ -1194,6 +1208,31 @@ app.post('/api/password/reset', async (req, res) => {
     }
     console.error('Erro no reset:', error);
     res.status(500).json({ error: 'Falha ao alterar senha' });
+  }
+});
+
+/**
+ * POST /api/email/test
+ * FUNÇÃO: Envia um email de teste apenas para o endereço fixo de teste
+ * REQUER: sessão de admin
+ * BODY opcional: { subject: string, html: string }
+ */
+app.post('/api/email/test', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : 'Teste SendGrid';
+    const html = typeof req.body?.html === 'string' && req.body.html.trim()
+      ? req.body.html.trim()
+      : '<h1>Email de teste</h1><p>Se recebeste isto, o envio está a funcionar.</p>';
+
+    await sendTestEmail({ subject, html });
+
+    res.json({ success: true, recipient: 'nascimentoxdavid@gmail.com' });
+  } catch (error) {
+    console.error('Erro no teste de email:', error);
+    res.status(500).json({ error: 'Falha ao enviar email de teste' });
   }
 });
 
