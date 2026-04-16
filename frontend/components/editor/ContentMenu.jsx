@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function ContentMenu({ recentImages, onSelectImage }) {
+export default function ContentMenu({ recentImages = [], onSelectImage }) {
   const [isOpen, setIsOpen] = useState(false);
 
   if (recentImages.length === 0) {
@@ -19,20 +19,20 @@ export default function ContentMenu({ recentImages, onSelectImage }) {
 
   return (
     <div className="relative">
-      <div className="relative group">
+      <div 
+        className="relative group"
+        onMouseEnter={() => setIsOpen(true)}
+        onMouseLeave={() => setIsOpen(false)}
+      >
         <button 
           className="text-black hover:text-black font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors"
-          onMouseEnter={() => setIsOpen(true)}
-          onMouseLeave={() => setIsOpen(false)}
         >
           Content ▾
         </button>
 
         {isOpen && (
           <div 
-            className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2"
-            onMouseEnter={() => setIsOpen(true)}
-            onMouseLeave={() => setIsOpen(false)}
+            className="absolute left-0 top-full w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2"
           >
             <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
               {recentImages.map((image) => (

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { buildApiUrl } from '../lib/api';
 
 export function useTemplates(templateId) {
   const [savedTemplates, setSavedTemplates] = useState([]);
@@ -9,11 +10,24 @@ export function useTemplates(templateId) {
 
   const fetchSavedTemplates = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/templates', { credentials: 'include' });
+      const response = await fetch(buildApiUrl('/api/templates'), { credentials: 'include' });
+
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData?.error || errorMessage;
+        } catch (e) {
+          try {
+            errorMessage = await response.text();
+          } catch (textError) {
+            // Use default error message
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
-
-      if (!response.ok) throw new Error(data?.error || 'Falha ao carregar templates guardados');
-
       const templates = Array.isArray(data.templates) ? data.templates : [];
       setSavedTemplates(templates);
 

@@ -6,7 +6,27 @@ export function useRecentImages() {
   useEffect(() => {
     try {
       const savedRecentImages = JSON.parse(localStorage.getItem('recentImages') || '[]');
-      const recentImages20 = savedRecentImages.slice(0, 20);
+      
+      // Filter images to only include those from the past 7 days
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      const filteredImages = savedRecentImages.filter((img) => {
+        // Handle missing or invalid date fields gracefully
+        if (!img.uploadedAt) {
+          return false;
+        }
+        try {
+          const imgDate = new Date(img.uploadedAt);
+          // Check if date is valid and within 7 days
+          return !isNaN(imgDate.getTime()) && imgDate >= sevenDaysAgo;
+        } catch (e) {
+          return false;
+        }
+      });
+      
+      // Slice to 20 after filtering by date
+      const recentImages20 = filteredImages.slice(0, 20);
       setRecentImages(recentImages20);
     } catch (error) {
       console.error('Error loading saved data:', error);

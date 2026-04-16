@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { getTemplate } from '@/lib/templates';
 import { getTemplateInitializer } from '@/lib/templateInitializers';
@@ -230,23 +230,33 @@ export default function EditorPage({ params }) {
       canvas.backgroundColor = '#ffffff';
       
       canvas.loadFromJSON(selectedLoadTemplate.canvasData, () => {
-        canvas.forEachObject((obj) => {
-          obj.visible = true;
-          if (obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') {
-            obj.set({
-              originX: 'left',
-              originY: 'top',
-            });
-          }
-        });
+        try {
+          canvas.forEachObject((obj) => {
+            obj.visible = true;
+            if (obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') {
+              obj.set({
+                originX: 'left',
+                originY: 'top',
+              });
+            }
+          });
 
-        canvas.calcOffset();
-        canvas.renderAll();
-        setSelectedObject(null);
-
-        setTimeout(() => {
+          canvas.calcOffset();
           canvas.renderAll();
-        }, 0);
+          setSelectedObject(null);
+
+          setTimeout(() => {
+            try {
+              canvas.renderAll();
+            } catch (err) {
+              console.error('Error in setTimeout callback:', err);
+            }
+          }, 0);
+        } catch (callbackError) {
+          console.error('Error in loadFromJSON callback:', callbackError);
+          setSelectedObject(null);
+          alert('Error processing template data');
+        }
       });
       
       setTimeout(() => {

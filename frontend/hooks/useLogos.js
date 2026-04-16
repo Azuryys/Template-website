@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { buildApiUrl } from '../lib/api';
 
 export function useLogos() {
   const [logoLibrary, setLogoLibrary] = useState([]);
@@ -6,15 +7,26 @@ export function useLogos() {
   useEffect(() => {
     const loadLogoLibrary = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/logos', {
+        const response = await fetch(buildApiUrl('/api/logos'), {
           credentials: 'include',
         });
-        const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data?.error || 'Falha ao carregar logos');
+          let errorMessage = `HTTP ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData?.error || errorMessage;
+          } catch (e) {
+            try {
+              errorMessage = await response.text();
+            } catch (textError) {
+              // Use default error message
+            }
+          }
+          throw new Error(errorMessage);
         }
 
+        const data = await response.json();
         setLogoLibrary(Array.isArray(data.logos) ? data.logos : []);
       } catch (error) {
         console.error('Error loading logo library:', error);

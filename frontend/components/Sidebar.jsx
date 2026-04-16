@@ -32,41 +32,54 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
     if (!selectedObject || !canvas) return;
 
     const handleKeyDown = (e) => {
-  let moved = false;
-  const step = 1;
+      // Early return if target is an editable element
+      const target = e.target;
+      const isEditableElement = 
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.contentEditable === 'true' ||
+        target.getAttribute('role') === 'textbox';
 
-  switch (e.key) {
-    case 'ArrowUp':
-      selectedObject.set('top', selectedObject.top - step);
-      moved = true;
-      e.preventDefault();
-      break;
-    case 'ArrowDown':
-      selectedObject.set('top', selectedObject.top + step);
-      moved = true;
-      e.preventDefault();
-      break;
-    case 'ArrowLeft':
-      selectedObject.set('left', selectedObject.left - step);
-      moved = true;
-      e.preventDefault();
-      break;
-    case 'ArrowRight':
-      selectedObject.set('left', selectedObject.left + step);
-      moved = true;
-      e.preventDefault();
-      break;
-    default:
-      break;
-  }
+      if (isEditableElement) {
+        return;
+      }
 
-  if (moved) {
-    // Set coords to recalculate control boxes
-    selectedObject.setCoords();
-    // Re-render the canvas
-    canvas.requestRenderAll();
-  }
-};
+      let moved = false;
+      const step = 1;
+
+      switch (e.key) {
+        case 'ArrowUp':
+          selectedObject.set('top', selectedObject.top - step);
+          moved = true;
+          e.preventDefault();
+          break;
+        case 'ArrowDown':
+          selectedObject.set('top', selectedObject.top + step);
+          moved = true;
+          e.preventDefault();
+          break;
+        case 'ArrowLeft':
+          selectedObject.set('left', selectedObject.left - step);
+          moved = true;
+          e.preventDefault();
+          break;
+        case 'ArrowRight':
+          selectedObject.set('left', selectedObject.left + step);
+          moved = true;
+          e.preventDefault();
+          break;
+        default:
+          break;
+      }
+
+      if (moved) {
+        // Set coords to recalculate control boxes
+        selectedObject.setCoords();
+        // Re-render the canvas
+        canvas.requestRenderAll();
+      }
+    };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
