@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Textbox, FabricImage } from 'fabric';
 import styles from './Sidebar.module.css';
 import autoAnimate from '@formkit/auto-animate';
-import { generateOutlookEML } from '../lib/outlook-eml';
 
 export default function Sidebar({ canvas, selectedObject, template, onClearCanvas, onImageUpload }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
@@ -27,6 +26,51 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
       autoAnimate(layersListRef.current);
     }
   }, [layersListRef]);
+
+  // Handle arrow key movement for selected objects
+  useEffect(() => {
+    if (!selectedObject || !canvas) return;
+
+    const handleKeyDown = (e) => {
+  let moved = false;
+  const step = 1;
+
+  switch (e.key) {
+    case 'ArrowUp':
+      selectedObject.set('top', selectedObject.top - step);
+      moved = true;
+      e.preventDefault();
+      break;
+    case 'ArrowDown':
+      selectedObject.set('top', selectedObject.top + step);
+      moved = true;
+      e.preventDefault();
+      break;
+    case 'ArrowLeft':
+      selectedObject.set('left', selectedObject.left - step);
+      moved = true;
+      e.preventDefault();
+      break;
+    case 'ArrowRight':
+      selectedObject.set('left', selectedObject.left + step);
+      moved = true;
+      e.preventDefault();
+      break;
+    default:
+      break;
+  }
+
+  if (moved) {
+    // Set coords to recalculate control boxes
+    selectedObject.setCoords();
+    // Re-render the canvas
+    canvas.requestRenderAll();
+  }
+};
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedObject, canvas]);
 
   useEffect(() => {
     if (!canvas) return;
@@ -348,14 +392,6 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
     }
   };
 
-  // Mirror image
-  const handleMirrorImage = () => {
-    if (selectedObject && selectedObject.type === 'image') {
-      selectedObject.set('flipX', !selectedObject.flipX);
-      canvas.renderAll();
-    }
-  };
-
   // Download PNG
   const handleDownload = () => {
     if (!canvas) return;
@@ -372,46 +408,34 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
   };
 
   // Open Outlook Draft
-  const handleOutlookDraft = () => {
-    let objectUrl = null;
-    let timeoutId = null;
+  const handleOutlookDraft = async () => {
     try {
       if (!canvas) return;
-
-      // Validate template exists before accessing properties
-      if (!template) {
-        console.error('Template is not defined');
-        return;
-      }
 
       const dataURL = canvas.toDataURL({
         format: 'png',
         quality: 1
       });
 
-      const blob = generateOutlookEML(dataURL);
-      objectUrl = URL.createObjectURL(blob);
+      // 1. Convert to a blob
+      const response = await fetch(dataURL);
+      const blob = await response.blob();
+
+      // 2. Write to clipboard
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type]: blob
+        })
+      ]);
+
+      alert('Image copied to clipboard! Once Outlook Web opens, you can paste it (Ctrl+V) into your email draft.');
+
+      // 3. Open Outlook Web Compose in a new tab
+      window.open('https://outlook.office.com/mail/deeplink/compose', '_blank');
       
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = `OutlookDraft-${template.width}x${template.height}-${Date.now()}.eml`;
-      link.click();
-      
-      // Defer revocation to allow browser to initiate download
-      timeoutId = setTimeout(() => {
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-        }
-      }, 300);
     } catch (error) {
-      console.error('Error generating Outlook draft:', error);
-      // Clean up blob URL to prevent memory leak on error
-      if (timeoutId !== null) {
-        clearTimeout(timeoutId);
-      }
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
+      console.error('Error copying to clipboard or opening Outlook:', error);
+      alert('Could not copy image automatically. Your browser might not support clipboard operations.');
     }
   };
 
@@ -883,12 +907,7 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
 
         {selectedObject && selectedObject.type === 'image' && (
           <div className="mt-4">
-            <button
-              onClick={handleMirrorImage}
-              className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-            >
-              ↔ Mirror Image
-            </button>
+            {/* Mirror image button moved to toolbar */}
           </div>
         )}
       </div>

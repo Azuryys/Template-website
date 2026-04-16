@@ -136,8 +136,8 @@ export const templates = {
   'email-header': {
     id: 'email-header',
     name: 'Email Header',
-    width: 1000,
-    height: 630,
+    width: 1200,
+    height: 600,
     description: 'Email header with image, text, and block',
     logo: { widthRatio: 0.15, leftRatio: 0.80, topRatio: 0.05 },
     audioLogo: { 

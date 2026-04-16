@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { getTemplate } from '@/lib/templates';
 import { getTemplateInitializer } from '@/lib/templateInitializers';
@@ -8,142 +8,15 @@ import { useState, use, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FabricImage } from 'fabric';
 import { FaUndo, FaRedo, FaCopy, FaPaste, FaTrash, FaCog, FaArrowUp, FaArrowDown } from 'react-icons/fa';
-const AUDIO_GROUPS = ['Mint', 'Lavender', 'Peach', 'Lemon', 'Aqua', 'Taffy'];
+import { MdFlip } from 'react-icons/md';
 
-function AudioLogoMenu({ audioLogos, handleAddAudioLogo }) {
-  const [openColor, setOpenColor] = useState(null);
+import AudioLogoMenu from '@/components/editor/AudioLogoMenu';
+import ContentMenu from '@/components/editor/ContentMenu';
 
-  const groupAudioLogos = useMemo(() => {
-    return AUDIO_GROUPS.map((groupName) => ({
-      groupName,
-      variants: audioLogos.filter((logo) => logo.name.toLowerCase().includes(groupName.toLowerCase())),
-    })).filter((group) => group.variants.length > 0);
-  }, [audioLogos]);
-
-  return (
-    <div className="relative">
-      {/* Main dropdown trigger */}
-      <div className="relative group">
-        <button className="text-black hover:text-black font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors">
-          Audio Logo ▾
-        </button>
-
-        {/* Color list */}
-        <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 py-1 max-h-[420px] overflow-y-auto">
-          {groupAudioLogos.map(({ groupName, variants }) => (
-            <div
-              key={groupName}
-              className="border-b border-gray-100 last:border-b-0"
-            >
-              <button
-                onClick={() => setOpenColor((prev) => (prev === groupName ? null : groupName))}
-                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center justify-between transition-colors"
-              >
-                <span>{groupName}</span>
-                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-
-              {openColor === groupName && (
-                <div className="px-3 pb-3">
-                  <div className="grid grid-cols-1 gap-1">
-                    {variants.map((logo) => {
-                      return (
-                        <button
-                          key={logo.id}
-                          onClick={() => handleAddAudioLogo(logo.filePath)}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 transition-colors text-left"
-                        >
-                          <div className="w-10 h-10 flex items-center justify-center bg-gray-50 rounded border border-gray-100">
-                            <img
-                              src={logo.filePath}
-                              alt={logo.name}
-                              className="max-h-8 max-w-full object-contain"
-                            />
-                          </div>
-                          <span className="text-xs text-gray-600">{logo.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ContentMenu({ recentImages, onSelectImage }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  if (recentImages.length === 0) {
-    return (
-      <div className="relative">
-        <button 
-          disabled
-          className="text-gray-400 font-medium px-3 py-1 rounded cursor-not-allowed"
-          title="No recent images in the past 7 days"
-        >
-          Content ▾
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative">
-      <div className="relative group">
-        <button 
-          className="text-black hover:text-black font-medium px-3 py-1 rounded hover:bg-gray-100 transition-colors"
-          onMouseEnter={() => setIsOpen(true)}
-          onMouseLeave={() => setIsOpen(false)}
-        >
-          Content ▾
-        </button>
-
-        {isOpen && (
-          <div 
-            className="absolute left-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-2"
-            onMouseEnter={() => setIsOpen(true)}
-            onMouseLeave={() => setIsOpen(false)}
-          >
-            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-              {recentImages.map((image) => (
-                <button
-                  key={image.id}
-                  onClick={() => {
-                    onSelectImage(image.src);
-                    setIsOpen(false);
-                  }}
-                  className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200 group/item"
-                  title={new Date(image.uploadedAt).toLocaleDateString()}
-                >
-                  <div className="w-full h-12 flex items-center justify-center bg-gray-50 rounded border border-gray-100 overflow-hidden">
-                    <img
-                      src={image.src}
-                      alt="Recent content"
-                      className="max-h-full max-w-full object-contain"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs text-gray-500 text-center line-clamp-1">
-                    {new Date(image.uploadedAt).toLocaleDateString()}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+import { useTemplates } from '@/hooks/useTemplates';
+import { useHotkeys } from '@/hooks/useHotkeys';
+import { useLogos } from '@/hooks/useLogos';
+import { useRecentImages } from '@/hooks/useRecentImages';
 
 export default function EditorPage({ params }) {
   const { templateId } = use(params);
@@ -161,118 +34,22 @@ export default function EditorPage({ params }) {
       };
     }
     return getTemplate(templateId);
-  // searchParams identity is stable; primitive values from get() are compared by value via deps below
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId, searchParams.get('width'), searchParams.get('height')]);
+
   const [canvas, setCanvas] = useState(null);
   const [selectedObject, setSelectedObject] = useState(null);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [templateName, setTemplateName] = useState('');
-  const [savedTemplates, setSavedTemplates] = useState([]);
-  const [showLoadModal, setShowLoadModal] = useState(false);
-  const [selectedLoadTemplate, setSelectedLoadTemplate] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [canvasActions, setCanvasActions] = useState(null);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [logoLibrary, setLogoLibrary] = useState([]);
-  const [hotkeys, setHotkeys] = useState({
-    undo: { ctrl: true, key: 'z' },
-    redo: { ctrl: true, key: 'y' },
-    copy: { ctrl: true, key: 'c' },
-    paste: { ctrl: true, key: 'v' },
-    delete: { key: 'Delete' },
-    bringForward: { ctrl: true, key: ']' },
-    sendBackward: { ctrl: true, key: '[' },
-  });
-  const [recordingAction, setRecordingAction] = useState(null);
-  const [recordedKeys, setRecordedKeys] = useState({});
-  const [recentImages, setRecentImages] = useState([]);
   const pendingPlaceholderRef = useRef(null);
 
-  const logoImages = useMemo(
-    () => logoLibrary.filter((item) => item.category === 'logo'),
-    [logoLibrary]
-  );
+  const { logoImages, audioLogoImages } = useLogos();
+  const { recentImages, saveRecentImage } = useRecentImages();
+  const { savedTemplates, showSaveModal, setShowSaveModal, templateName, setTemplateName, showLoadModal, setShowLoadModal, selectedLoadTemplate, setSelectedLoadTemplate, fetchSavedTemplates } = useTemplates(templateId);
+  const { hotkeys, setHotkeys, showSettingsModal, setShowSettingsModal, recordingAction, setRecordingAction, recordedKeys, setRecordedKeys, hotkeyError, setHotkeyError, handleSaveHotkey, handleResetHotkeys } = useHotkeys();
 
-  const audioLogoImages = useMemo(
-    () => logoLibrary.filter((item) => item.category === 'audio'),
-    [logoLibrary]
-  );
-
-  useEffect(() => {
-    const loadLogoLibrary = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/api/logos', {
-          credentials: 'include',
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.error || 'Falha ao carregar logos');
-        }
-
-        setLogoLibrary(Array.isArray(data.logos) ? data.logos : []);
-      } catch (error) {
-        console.error('Error loading logo library:', error);
-        setLogoLibrary([]);
-      }
-    };
-
-    loadLogoLibrary();
-  }, []);
-
-  const fetchSavedTemplates = useCallback(async () => {
-    try {
-      const response = await fetch('http://localhost:3001/api/templates', {
-        credentials: 'include',
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.error || 'Falha ao carregar templates guardados');
-      }
-
-      const templates = Array.isArray(data.templates) ? data.templates : [];
-      setSavedTemplates(templates);
-
-      try {
-        localStorage.setItem('savedTemplates', JSON.stringify(templates));
-      } catch (storageError) {
-        console.error('Error caching saved templates locally:', storageError);
-      }
-    } catch (error) {
-      console.error('Error loading saved templates from backend:', error);
-
-      try {
-        const fallbackTemplates = JSON.parse(localStorage.getItem('savedTemplates') || '[]');
-        setSavedTemplates(fallbackTemplates);
-      } catch (storageError) {
-        console.error('Error loading fallback saved templates:', storageError);
-      }
-    }
-  }, []);
-
-  // Load saved templates, hotkeys, and recent images from localStorage
-  useEffect(() => {
-    try {
-      const savedHotkeys = JSON.parse(localStorage.getItem('canvasHotkeys') || '{}');
-      if (Object.keys(savedHotkeys).length > 0) {
-        setHotkeys(savedHotkeys);
-      }
-
-      // Load recent images - keep last 20
-      const savedRecentImages = JSON.parse(localStorage.getItem('recentImages') || '[]');
-      const recentImages20 = savedRecentImages.slice(0, 20);
-      setRecentImages(recentImages20);
-    } catch (error) {
-      console.error('Error loading saved data:', error);
-    }
-
-    fetchSavedTemplates();
-  }, []);
-
-  // Helper function to format hotkey for display
+  // Helper function for display
   const formatHotkey = (hotkeyObj) => {
     if (!hotkeyObj) return '';
     const parts = [];
@@ -284,12 +61,6 @@ export default function EditorPage({ params }) {
       parts.push(keyDisplay);
     }
     return parts.join('+');
-  };
-
-  // Handle hotkey recording
-  const handleStartRecording = (action) => {
-    setRecordingAction(action);
-    setRecordedKeys({});
   };
 
   const handleKeyRecord = (e) => {
@@ -310,7 +81,6 @@ export default function EditorPage({ params }) {
       key: keyChar,
     };
 
-    // Remove empty properties
     Object.keys(newKeys).forEach(k => !newKeys[k] && delete newKeys[k]);
 
     if (!newKeys.key) {
@@ -320,40 +90,10 @@ export default function EditorPage({ params }) {
     setRecordedKeys(newKeys);
   };
 
-  const handleSaveHotkey = () => {
-    if (!recordingAction || Object.keys(recordedKeys).length === 0) {
-      alert('Please record a hotkey');
-      return;
-    }
-
-    const updatedHotkeys = { ...hotkeys, [recordingAction]: recordedKeys };
-    setHotkeys(updatedHotkeys);
-    localStorage.setItem('canvasHotkeys', JSON.stringify(updatedHotkeys));
-    setRecordingAction(null);
-    setRecordedKeys({});
-  };
-
-  const handleResetHotkeys = () => {
-    const defaultHotkeys = {
-      undo: { ctrl: true, key: 'z' },
-      redo: { ctrl: true, key: 'y' },
-      copy: { ctrl: true, key: 'c' },
-      paste: { ctrl: true, key: 'v' },
-      delete: { key: 'Delete' },
-      bringForward: { ctrl: true, key: ']' },
-      sendBackward: { ctrl: true, key: '[' },
-    };
-    setHotkeys(defaultHotkeys);
-    localStorage.setItem('canvasHotkeys', JSON.stringify(defaultHotkeys));
-    setRecordingAction(null);
-    setRecordedKeys({});
-  };
-
   const handleCanvasReady = useCallback((canvasInstance, actions) => {
     setCanvas(canvasInstance);
     setCanvasActions(actions);
     
-    // Initialize template-specific preloaded elements
     const initializer = getTemplateInitializer(templateId);
     if (initializer) {
       const elements = initializer(template);
@@ -363,12 +103,11 @@ export default function EditorPage({ params }) {
       canvasInstance.renderAll();
     }
 
-    // Handle placeholder click events
     canvasInstance.on('mouse:dblclick', (options) => {
-  if (options.target && options.target.isPlaceholder) {
-    handlePlaceholderClick(options.target);
-  }
-});
+      if (options.target && options.target.isPlaceholder) {
+        handlePlaceholderClick(options.target);
+      }
+    });
   }, [templateId, template]);
 
   const handleSelectionChange = useCallback((obj) => {
@@ -384,6 +123,49 @@ export default function EditorPage({ params }) {
     }
   };
 
+  const handleMirrorImage = () => {
+    if (selectedObject && selectedObject.type === 'image') {
+      selectedObject.set('flipX', !selectedObject.flipX);
+      canvas.renderAll();
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) {
+        return;
+      }
+
+      const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+      const pressedKeys = {
+        ctrl: isMac ? e.metaKey : e.ctrlKey,
+        shift: e.shiftKey,
+        alt: e.altKey,
+        key: e.key === ' ' ? 'Space' : e.key,
+      };
+
+      const matchesHotkey = (hotkeyConfig) => {
+        if (!hotkeyConfig) return false;
+        const configKey = hotkeyConfig.key?.toLowerCase?.() || hotkeyConfig.key;
+        const pressedKey = pressedKeys.key?.toLowerCase?.() || pressedKeys.key;
+        if ((hotkeyConfig.ctrl || false) !== (pressedKeys.ctrl || false)) return false;
+        if ((hotkeyConfig.shift || false) !== (pressedKeys.shift || false)) return false;
+        if ((hotkeyConfig.alt || false) !== (pressedKeys.alt || false)) return false;
+        return configKey === pressedKey;
+      };
+
+      if (matchesHotkey(hotkeys.mirror)) {
+        e.preventDefault();
+        handleMirrorImage();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hotkeys, selectedObject, canvas]);
+
   const handleSaveTemplate = async () => {
     if (!templateName.trim()) {
       alert('Please enter a template name');
@@ -396,7 +178,6 @@ export default function EditorPage({ params }) {
     }
 
     try {
-      // Get canvas data as JSON
       const canvasData = canvas.toJSON();
 
       const response = await fetch('http://localhost:3001/api/templates', {
@@ -423,7 +204,6 @@ export default function EditorPage({ params }) {
 
       await fetchSavedTemplates();
 
-      // Reset modal
       setShowSaveModal(false);
       setTemplateName('');
       
@@ -443,37 +223,32 @@ export default function EditorPage({ params }) {
     try {
       const loadTemplateName = selectedLoadTemplate.name;
       
-      // Close modal and reset state first
       setShowLoadModal(false);
       setSelectedLoadTemplate(null);
       
-      // Clear current canvas
       canvas.clear();
       canvas.backgroundColor = '#ffffff';
       
       canvas.loadFromJSON(selectedLoadTemplate.canvasData, () => {
-  canvas.forEachObject((obj) => {
-    obj.visible = true;
+        canvas.forEachObject((obj) => {
+          obj.visible = true;
+          if (obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') {
+            obj.set({
+              originX: 'left',
+              originY: 'top',
+            });
+          }
+        });
 
-    // ✅ Fix cursor misalignment for all text objects
-    if (obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') {
-      obj.set({
-        originX: 'left',
-        originY: 'top',
+        canvas.calcOffset();
+        canvas.renderAll();
+        setSelectedObject(null);
+
+        setTimeout(() => {
+          canvas.renderAll();
+        }, 0);
       });
-    }
-  });
-
-  canvas.calcOffset();
-  canvas.renderAll();
-  setSelectedObject(null);
-
-  setTimeout(() => {
-    canvas.renderAll();
-  }, 0);
-});
       
-      // Show success message after a short delay
       setTimeout(() => {
         alert(`Template "${loadTemplateName}" loaded successfully!`);
       }, 300);
@@ -490,36 +265,6 @@ export default function EditorPage({ params }) {
     }
     pendingPlaceholderRef.current = placeholder;
     setShowImageModal(true);
-  };
-
-  const saveRecentImage = (imageSource) => {
-    try {
-      const savedRecentImages = JSON.parse(localStorage.getItem('recentImages') || '[]');
-      
-      // Check if image already exists (to avoid duplicates)
-      const imageExists = savedRecentImages.some(
-        img => img.src === imageSource
-      );
-      
-      if (!imageExists) {
-        const newImage = {
-          src: imageSource,
-          uploadedAt: new Date().toISOString(),
-          id: Date.now(),
-        };
-        
-        savedRecentImages.unshift(newImage); // Add to beginning
-        // Keep only last 50 images total, but display only 20
-        const trimmedImages = savedRecentImages.slice(0, 50);
-        localStorage.setItem('recentImages', JSON.stringify(trimmedImages));
-        
-        // Update state with last 20 images
-        const recentImages20 = trimmedImages.slice(0, 20);
-        setRecentImages(recentImages20);
-      }
-    } catch (error) {
-      console.error('Error saving recent image:', error);
-    }
   };
 
   const handleImageFileSelect = (e) => {
@@ -550,43 +295,41 @@ export default function EditorPage({ params }) {
   };
 
   const insertImageIntoPlaceholder = (imageSource) => {
-  const placeholder = pendingPlaceholderRef.current;
-  if (!canvas || !placeholder) return;
+    const placeholder = pendingPlaceholderRef.current;
+    if (!canvas || !placeholder) return;
 
-  // Use bounding rect to get the true rendered position and size
-  const boundingRect = placeholder.getBoundingRect();
-  const placeholderLeft = boundingRect.left;
-  const placeholderTop = boundingRect.top;
-  const placeholderWidth = boundingRect.width;
-  const placeholderHeight = boundingRect.height;
+    const boundingRect = placeholder.getBoundingRect();
+    const placeholderLeft = boundingRect.left;
+    const placeholderTop = boundingRect.top;
+    const placeholderWidth = boundingRect.width;
+    const placeholderHeight = boundingRect.height;
 
-  FabricImage.fromURL(imageSource, { crossOrigin: 'anonymous' }).then((img) => {
-    const scaleX = placeholderWidth / img.width;
-    const scaleY = placeholderHeight / img.height;  
-    const scale = Math.min(scaleX, scaleY);
+    FabricImage.fromURL(imageSource, { crossOrigin: 'anonymous' }).then((img) => {
+      const scaleX = placeholderWidth / img.width;
+      const scaleY = placeholderHeight / img.height;  
+      const scale = Math.min(scaleX, scaleY);
 
-    img.scale(scale);
-    img.set({
-      left: placeholderLeft + placeholderWidth / 2,
-      top: placeholderTop + placeholderHeight / 2,
-      originX: 'center',
-      originY: 'center',
-      name: 'headerImage',
+      img.scale(scale);
+      img.set({
+        left: placeholderLeft + placeholderWidth / 2,
+        top: placeholderTop + placeholderHeight / 2,
+        originX: 'center',
+        originY: 'center',
+        name: 'headerImage',
+      });
+
+      canvas.remove(placeholder);
+      canvas.add(img);
+      canvas.renderAll();
+      pendingPlaceholderRef.current = null;
+      setShowImageModal(false);
+
+      saveRecentImage(imageSource);
+    }).catch((error) => {
+      console.error('Error loading image:', error);
+      alert('Failed to load image. Please check the URL or try a different image.');
     });
-
-    canvas.remove(placeholder);
-    canvas.add(img);
-    canvas.renderAll();
-    pendingPlaceholderRef.current = null;
-    setShowImageModal(false);
-
-    // Save to recent images
-    saveRecentImage(imageSource);
-  }).catch((error) => {
-    console.error('Error loading image:', error);
-    alert('Failed to load image. Please check the URL or try a different image.');
-  });
-};
+  };
 
   const handleAddLogo = (file) => {
     if (!canvas) return;
@@ -609,26 +352,24 @@ export default function EditorPage({ params }) {
     if (!canvas) return;
     FabricImage.fromURL(file, { crossOrigin: 'anonymous' }).then((img) => {
       const placement = template.audioLogo ?? { 
-        widthRatio: 0.20,        // base reference size
+        widthRatio: 0.20,
         leftRatio: 0.06, 
         topRatio: 0.05,
-        horizontalStretch: 1.0,  // 1.0 = normal width
-        verticalStretch: 1.0     // 1.0 = normal height
+        horizontalStretch: 1.0,
+        verticalStretch: 1.0
       };
       
-      // Calculate base scale from widthRatio (used as reference)
       const baseSize = canvas.width * placement.widthRatio;
       const baseScale = baseSize / img.width;
       
-      // Apply independent stretch factors
       const hStretch = placement.horizontalStretch ?? 1.0;
       const vStretch = placement.verticalStretch ?? 1.0;
       
       img.set({
         left: canvas.width * placement.leftRatio,
         top: canvas.height * placement.topRatio,
-        scaleX: -baseScale * hStretch,   // negative for flip
-        scaleY: baseScale * vStretch,    // vertical stretch independent
+        scaleX: -baseScale * hStretch,
+        scaleY: baseScale * vStretch,
       });
       canvas.add(img);
       canvas.setActiveObject(img);
@@ -639,7 +380,6 @@ export default function EditorPage({ params }) {
   const handleAddContentImage = (imageSource) => {
     if (!canvas) return;
     FabricImage.fromURL(imageSource, { crossOrigin: 'anonymous' }).then((img) => {
-      // Add image at center of canvas with reasonable size
       const maxWidth = canvas.width * 0.5;
       const maxHeight = canvas.height * 0.5;
       
@@ -665,7 +405,15 @@ export default function EditorPage({ params }) {
     });
   };
 
-
+  const hotkeyToString = (hotkey) => {
+    if (!hotkey) return '';
+    return JSON.stringify({
+      ctrl: hotkey.ctrl || false,
+      shift: hotkey.shift || false,
+      alt: hotkey.alt || false,
+      key: (hotkey.key || '').toLowerCase(),
+    });
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -766,17 +514,40 @@ export default function EditorPage({ params }) {
               <div className="border-l border-gray-300 h-5 mx-1"></div>
               <button
                 onClick={() => canvasActions?.bringForward()}
+                disabled={!selectedObject}
                 title="Bring Forward (Ctrl+])"
-                className="p-2 text-black hover:text-black hover:bg-gray-100 rounded transition-colors"
+                className={`p-2 rounded transition-colors ${
+                  selectedObject
+                    ? 'text-black hover:text-black hover:bg-gray-100 cursor-pointer'
+                    : 'text-gray-400 cursor-not-allowed'
+                }`}
               >
                 <FaArrowUp className="w-4 h-4" />
               </button>
               <button
                 onClick={() => canvasActions?.sendBackward()}
+                disabled={!selectedObject}
                 title="Send Backward (Ctrl+[)"
-                className="p-2 text-black hover:text-black hover:bg-gray-100 rounded transition-colors"
+                className={`p-2 rounded transition-colors ${
+                  selectedObject
+                    ? 'text-black hover:text-black hover:bg-gray-100 cursor-pointer'
+                    : 'text-gray-400 cursor-not-allowed'
+                }`}
               >
                 <FaArrowDown className="w-4 h-4" />
+              </button>
+              <div className="border-l border-gray-300 h-5 mx-1"></div>
+              <button
+                onClick={handleMirrorImage}
+                disabled={!selectedObject || selectedObject.type !== 'image'}
+                title="Mirror Image"
+                className={`p-2 rounded transition-colors ${
+                  selectedObject && selectedObject.type === 'image'
+                    ? 'text-black hover:text-black hover:bg-gray-100 cursor-pointer'
+                    : 'text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                <MdFlip className="w-4 h-4" />
               </button>
             </div>
             
@@ -834,16 +605,16 @@ export default function EditorPage({ params }) {
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Canvas Area */}
-<div className="flex-1 overflow-auto bg-gray-100">
-  <div className="min-h-full flex items-center justify-center p-8">
-    <CanvasEditor
-      template={template}
-      onCanvasReady={handleCanvasReady}
-      onSelectionChange={handleSelectionChange}
-      hotkeys={hotkeys}
-    />
-  </div>
-</div>
+        <div className="flex-1 overflow-auto bg-gray-100">
+          <div className="min-h-full flex items-center justify-center p-8">
+            <CanvasEditor
+              template={template}
+              onCanvasReady={handleCanvasReady}
+              onSelectionChange={handleSelectionChange}
+              hotkeys={hotkeys}
+            />
+          </div>
+        </div>
 
         {/* Right Sidebar */}
         <Sidebar
@@ -996,6 +767,12 @@ export default function EditorPage({ params }) {
           <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl max-h-[600px] overflow-y-auto">
             <h2 className="text-2xl font-bold text-black mb-6">Hotkey Settings</h2>
             
+            {hotkeyError && (
+              <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4">
+                <p className="text-sm text-red-700 font-medium">{hotkeyError}</p>
+              </div>
+            )}
+            
             <div className="space-y-4 mb-6">
               {[
                 { action: 'undo', label: 'Undo' },
@@ -1005,63 +782,87 @@ export default function EditorPage({ params }) {
                 { action: 'delete', label: 'Delete' },
                 { action: 'bringForward', label: 'Bring Forward' },
                 { action: 'sendBackward', label: 'Send Backward' },
-              ].map(({ action, label }) => (
-                <div key={action} className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="font-medium text-black">{label}</label>
-                    <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded text-black">
-                      {formatHotkey(hotkeys[action])}
-                    </span>
-                  </div>
-                  {recordingAction === action ? (
-                    <div className="space-y-2">
-                      <input
-                        autoFocus
-                        onKeyDown={handleKeyRecord}
-                        type="text"
-                        readOnly
-                        value={Object.keys(recordedKeys).length > 0 ? formatHotkey(recordedKeys) : 'Press any key...'}
-                        className="w-full px-3 py-2 border-2 border-blue-500 rounded bg-blue-50 text-center text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900"
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSaveHotkey}
-                          className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded transition-colors"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setRecordingAction(null);
-                            setRecordedKeys({});
-                          }}
-                          className="flex-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 text-sm font-medium rounded transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                { action: 'mirror', label: 'Mirror Image' },
+              ].map(({ action, label }) => {
+                const isConflictingAction = hotkeyError && recordedKeys.key && hotkeyToString(hotkeys[action]) === hotkeyToString(recordedKeys) && action !== recordingAction;
+                return (
+                  <div key={action} className={`border rounded-lg p-3 transition-colors ${
+                    isConflictingAction 
+                      ? 'border-red-300 bg-red-50' 
+                      : 'border-gray-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="font-medium text-black">{label}</label>
+                      <span className={`text-sm font-mono px-2 py-1 rounded ${
+                        isConflictingAction
+                          ? 'bg-red-200 text-red-700 font-semibold'
+                          : 'bg-gray-100 text-black'
+                      }`}>
+                        {formatHotkey(hotkeys[action])}
+                      </span>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => handleStartRecording(action)}
-                      className="w-full px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
-              ))}
+                    {recordingAction === action ? (
+                      <div className="space-y-2">
+                        <input
+                          autoFocus
+                          onKeyDown={handleKeyRecord}
+                          type="text"
+                          readOnly
+                          value={Object.keys(recordedKeys).length > 0 ? formatHotkey(recordedKeys) : 'Press any key...'}
+                          className="w-full px-3 py-2 border-2 border-blue-500 rounded bg-blue-50 text-center text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-900"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveHotkey}
+                            className="flex-1 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setRecordingAction(null);
+                              setRecordedKeys({});
+                              setHotkeyError(null);
+                            }}
+                            className="flex-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 text-sm font-medium rounded transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setRecordingAction(action);
+                          setHotkeyError(null);
+                        }}
+                        className="w-full px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="flex gap-3">
               <button
-                onClick={handleResetHotkeys}
+                onClick={() => {
+                  handleResetHotkeys();
+                  setHotkeyError(null);
+                }}
                 className="flex-1 px-4 py-2 text-black font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-sm"
               >
                 Reset to Default
               </button>
               <button
-                onClick={() => setShowSettingsModal(false)}
+                onClick={() => {
+                  setShowSettingsModal(false);
+                  setHotkeyError(null);
+                  setRecordingAction(null);
+                  setRecordedKeys({});
+                }}
                 className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors text-sm"
               >
                 Close
