@@ -166,8 +166,8 @@ export const templates = {
     textBox: { 
       widthRatio: 0.9,     // 900px / 1200px
       heightRatio: 0.3333,  // 210px / 630px
-      leftRatio: 0.5,     // 150px / 1200px
-      topRatio: 0.7,      // 390px / 630px
+      leftRatio: 0.05,     // 150px / 1200px
+      topRatio: 0.75,      // 390px / 630px
       fontSize: 80,
       textAlign: 'center'
     }
