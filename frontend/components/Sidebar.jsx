@@ -373,23 +373,46 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
 
   // Open Outlook Draft
   const handleOutlookDraft = () => {
-    if (!canvas) return;
+    let objectUrl = null;
+    let timeoutId = null;
+    try {
+      if (!canvas) return;
 
-    const dataURL = canvas.toDataURL({
-      format: 'png',
-      quality: 1
-    });
+      // Validate template exists before accessing properties
+      if (!template) {
+        console.error('Template is not defined');
+        return;
+      }
 
-    const blob = generateOutlookEML(dataURL);
-    const objectUrl = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = objectUrl;
-    link.download = `OutlookDraft-${template.width}x${template.height}-${Date.now()}.eml`;
-    link.click();
-    
-    // Clean up
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 1
+      });
+
+      const blob = generateOutlookEML(dataURL);
+      objectUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `OutlookDraft-${template.width}x${template.height}-${Date.now()}.eml`;
+      link.click();
+      
+      // Defer revocation to allow browser to initiate download
+      timeoutId = setTimeout(() => {
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }, 300);
+    } catch (error) {
+      console.error('Error generating Outlook draft:', error);
+      // Clean up blob URL to prevent memory leak on error
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
   };
 
   return (

@@ -1204,19 +1204,38 @@ app.post('/api/password/reset', async (req, res) => {
 
 // Store temporary images in memory with expiry
 const tempImages = new Map();
+const userTempImages = new Map(); // Track per-user uploads for quota
 const TEMP_IMAGE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_TEMP_IMAGES_PER_USER = 10; // Max images per user
 
 /**
  * POST /api/email/upload-image
  * Upload base64 image temporarily for email compose
- * Returns: { imageId, imageUrl, expiresIn }
+ * Requires authentication. Enforces per-user quota.
+ * Returns: { imageId, imageUrl, expiresIn } or 429 if quota exceeded
  */
-app.post('/api/email/upload-image', express.json({ limit: '5mb' }), (req, res) => {
+app.post('/api/email/upload-image', express.json({ limit: '5mb' }), async (req, res) => {
   try {
+    // Verify authentication with Better Auth
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+
+    if (!session || !session.user) {
+      return res.status(401).json({ error: 'Não autenticado' });
+    }
+
+    const userId = session.user.id;
     const { imageBase64, fileName } = req.body;
 
     if (!imageBase64 || !imageBase64.startsWith('data:image/')) {
       return res.status(400).json({ error: 'Invalid image data' });
+    }
+
+    // Check per-user quota
+    const userImages = userTempImages.get(userId) || [];
+    if (userImages.length >= MAX_TEMP_IMAGES_PER_USER) {
+      return res.status(429).json({ error: 'Image quota exceeded. Please delete unused images.' });
     }
 
     // Generate unique image ID
@@ -1229,15 +1248,31 @@ app.post('/api/email/upload-image', express.json({ limit: '5mb' }), (req, res) =
 
     // Store in memory
     tempImages.set(imageId, {
+      userId,
       data: base64Data,
       mimeType,
       fileName: fileName || `image-${Date.now()}.png`,
       createdAt: Date.now(),
     });
 
+    // Track in per-user map
+    userImages.push(imageId);
+    userTempImages.set(userId, userImages);
+
     // Auto-delete after expiry
     setTimeout(() => {
       tempImages.delete(imageId);
+      // Clean up from per-user map
+      const userImgList = userTempImages.get(userId) || [];
+      const idx = userImgList.indexOf(imageId);
+      if (idx !== -1) {
+        userImgList.splice(idx, 1);
+        if (userImgList.length === 0) {
+          userTempImages.delete(userId);
+        } else {
+          userTempImages.set(userId, userImgList);
+        }
+      }
     }, TEMP_IMAGE_EXPIRY_MS);
 
     const imageUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/email/temp-image/${imageId}`;
@@ -1256,15 +1291,30 @@ app.post('/api/email/upload-image', express.json({ limit: '5mb' }), (req, res) =
 
 /**
  * GET /api/email/temp-image/:imageId
- * Retrieve temporary image, auto-delete after serving
+ * Retrieve temporary image. Deletion handled via TEMP_IMAGE_EXPIRY_MS timeout.
+ * Requires authentication to prevent unauthorized access.
  */
-app.get('/api/email/temp-image/:imageId', (req, res) => {
+app.get('/api/email/temp-image/:imageId', async (req, res) => {
   try {
+    // Verify authentication with Better Auth
+    const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    });
+
+    if (!session || !session.user) {
+      return res.status(401).json({ error: 'Não autenticado' });
+    }
+
     const { imageId } = req.params;
     const imageData = tempImages.get(imageId);
 
     if (!imageData) {
       return res.status(404).json({ error: 'Image not found or expired' });
+    }
+
+    // Verify user owns this image
+    if (imageData.userId !== session.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
     }
 
     // Convert base64 to buffer

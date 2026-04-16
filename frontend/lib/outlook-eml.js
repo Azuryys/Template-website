@@ -14,7 +14,7 @@ export function generateOutlookEML(dataURL) {
     "",
     `--${boundary}`,
     "Content-Type: text/html; charset=\"utf-8\"",
-    "Content-Transfer-Encoding: quoted-printable",
+    "Content-Transfer-Encoding: 7bit",
     "",
     "<html>",
     "<body>",
