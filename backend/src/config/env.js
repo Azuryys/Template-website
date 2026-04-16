@@ -34,10 +34,16 @@ export const ENV =  {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     // URL base do servidor (usado para callbacks/redirects de autenticação)
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    // URL do frontend para redirects e links externos
+    FRONTEND_URL: process.env.FRONTEND_URL,
 
+    // ========== SENDGRID (ENVIO DE EMAILS) ==========
+    SENDGRID_API_KEY: process.env.SENDGRID_API_KEY, // Chave de API do SendGrid
+    SENDGRID_FROM_EMAIL: process.env.SENDGRID_FROM_EMAIL, // Email remetente para envios
+    SENDGRID_TEST_TO_EMAIL: process.env.SENDGRID_TEST_TO_EMAIL, // Email fixo para testes
 
-    // ========== RESEND (ENVIO DE EMAILS) ==========
-    RESEND_API_KEY: process.env.RESEND_API_KEY, // Chave de API do Resend
-    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL, // Email remetente para envios
+    // Campos antigos mantidos por compatibilidade com código legado
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
 
 };

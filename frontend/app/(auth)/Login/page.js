@@ -1,16 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // Carrega email guardado ao montar o componente
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberMeEmail');
+    const savedRememberMe = localStorage.getItem('rememberMe');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(savedRememberMe === 'true');
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,6 +29,15 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // Guardar ou remover email conforme a opção "Lembrar-me"
+      if (rememberMe) {
+        localStorage.setItem('rememberMeEmail', email);
+        localStorage.setItem('rememberMe', 'true');
+      } else {
+        localStorage.removeItem('rememberMeEmail');
+        localStorage.removeItem('rememberMe');
+      }
+
       const { data, error: authError } = await authClient.signIn.email({
         email,
         password,
@@ -83,7 +103,12 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center">
-                <input type="checkbox" className="w-4 h-4 border-gray-300 rounded focus:ring-blue-500 cursor-pointer" />
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 border-gray-300 rounded focus:ring-blue-500 cursor-pointer" 
+                />
                 <span className="ml-2 text-gray-600">Lembrar-me</span>
               </label>
               
@@ -103,12 +128,12 @@ export default function LoginPage() {
           
 
           <div className="pt-2 text-center">
-               <p className="text-sm text-gray-600">
+              {/* <p className="text-sm text-gray-600">
                 Ainda não tem conta?{' '}
                 <Link href="/Register" className="font-semibold text-blue-600 hover:text-blue-700">
                   Registar
                 </Link>
-              </p>
+              </p> */}
 
             </div>
           </form>
