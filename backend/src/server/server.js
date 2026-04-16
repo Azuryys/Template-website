@@ -226,7 +226,7 @@ app.use('/Templates', express.static(TEMPLATES_ROOT));
 app.use(express.json());
 
 // Valida sessao e permissao admin para proteger rotas administrativas.
-async function requireAdminSession(req, res) {
+async function requireAuthenticatedSession(req, res) {
   const session = await auth.api.getSession({
     headers: fromNodeHeaders(req.headers),
   });
@@ -235,6 +235,14 @@ async function requireAdminSession(req, res) {
     res.status(401).json({ error: 'Não autenticado' });
     return null;
   }
+
+  return session;
+}
+
+// Valida sessao e permissao admin para proteger rotas administrativas.
+async function requireAdminSession(req, res) {
+  const session = await requireAuthenticatedSession(req, res);
+  if (!session) return null;
 
   const role = session.user.role || session.user.usertype;
   const isAdmin = role === 'admin' || role === 'superadmin';
@@ -332,7 +340,7 @@ app.get('/api/admin/reports', async (req, res) => {
 // Devolve a biblioteca de logos existente nas pastas da app.
 app.get('/api/logos/library', async (req, res) => {
   try {
-    const session = await requireAdminSession(req, res);
+    const session = await requireAuthenticatedSession(req, res);
     if (!session) return;
 
     const logos = await readLogoLibrary();
@@ -407,7 +415,7 @@ app.post('/api/logos/upload', (req, res) => {
 // Lista logos que ja foram guardados na base de dados.
 app.get('/api/logos', async (req, res) => {
   try {
-    const session = await requireAdminSession(req, res);
+    const session = await requireAuthenticatedSession(req, res);
     if (!session) return;
 
     const result = await pool.query(
@@ -526,7 +534,7 @@ app.delete('/api/logos/:id', async (req, res) => {
 // Devolve os templates estáticos disponíveis para começar um novo layout.
 app.get('/api/templates/library', async (req, res) => {
   try {
-    const session = await requireAdminSession(req, res);
+  const session = await requireAuthenticatedSession(req, res);
     if (!session) return;
 
     const result = await pool.query(
@@ -548,7 +556,7 @@ app.get('/api/templates/library', async (req, res) => {
 // Lista templates guardados na base de dados.
 app.get('/api/templates', async (req, res) => {
   try {
-    const session = await requireAdminSession(req, res);
+    const session = await requireAuthenticatedSession(req, res);
     if (!session) return;
 
     const { sourceTemplateId } = req.query;
