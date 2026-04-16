@@ -1197,6 +1197,93 @@ app.post('/api/password/reset', async (req, res) => {
   }
 });
 
+
+// ============================================
+// EMAIL ROUTES - Temporary Image Upload
+// ============================================
+
+// Store temporary images in memory with expiry
+const tempImages = new Map();
+const TEMP_IMAGE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * POST /api/email/upload-image
+ * Upload base64 image temporarily for email compose
+ * Returns: { imageId, imageUrl, expiresIn }
+ */
+app.post('/api/email/upload-image', express.json({ limit: '5mb' }), (req, res) => {
+  try {
+    const { imageBase64, fileName } = req.body;
+
+    if (!imageBase64 || !imageBase64.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Invalid image data' });
+    }
+
+    // Generate unique image ID
+    const imageId = uuidv4();
+
+    // Extract MIME type and remove data URI prefix
+    const mimeMatch = imageBase64.match(/data:([^;]+)/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+    const base64Data = imageBase64.replace(/^data:image\/[^;]+;base64,/, '');
+
+    // Store in memory
+    tempImages.set(imageId, {
+      data: base64Data,
+      mimeType,
+      fileName: fileName || `image-${Date.now()}.png`,
+      createdAt: Date.now(),
+    });
+
+    // Auto-delete after expiry
+    setTimeout(() => {
+      tempImages.delete(imageId);
+    }, TEMP_IMAGE_EXPIRY_MS);
+
+    const imageUrl = `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/email/temp-image/${imageId}`;
+
+    res.json({
+      success: true,
+      imageId,
+      imageUrl,
+      expiresIn: TEMP_IMAGE_EXPIRY_MS / 1000, // seconds
+    });
+  } catch (error) {
+    console.error('Error uploading temporary image:', error);
+    res.status(500).json({ error: 'Failed to upload image' });
+  }
+});
+
+/**
+ * GET /api/email/temp-image/:imageId
+ * Retrieve temporary image, auto-delete after serving
+ */
+app.get('/api/email/temp-image/:imageId', (req, res) => {
+  try {
+    const { imageId } = req.params;
+    const imageData = tempImages.get(imageId);
+
+    if (!imageData) {
+      return res.status(404).json({ error: 'Image not found or expired' });
+    }
+
+    // Convert base64 to buffer
+    const buffer = Buffer.from(imageData.data, 'base64');
+
+    // Set response headers
+    res.setHeader('Content-Type', imageData.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${imageData.fileName}"`);
+    res.setHeader('Cache-Control', 'private, max-age=1800'); // 30 min cache
+
+    // Send image
+    res.send(buffer);
+
+  } catch (error) {
+    console.error('Error serving temporary image:', error);
+    res.status(500).json({ error: 'Failed to serve image' });
+  }
+});
+
 // Better Auth - handler para rotas de autenticação
 app.all("/api/auth/*", toNodeHandler(auth));
 

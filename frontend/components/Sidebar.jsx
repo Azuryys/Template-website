@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Textbox, FabricImage } from 'fabric';
 import styles from './Sidebar.module.css';
 import autoAnimate from '@formkit/auto-animate';
-import EmailComposeModal from './EmailComposeModal';
+import { generateOutlookEML } from '../lib/outlook-eml';
 
 export default function Sidebar({ canvas, selectedObject, template, onClearCanvas, onImageUpload }) {
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
@@ -20,7 +20,6 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [showImageUrlModal, setShowImageUrlModal] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [showEmailModal, setShowEmailModal] = useState(false);
   const layersListRef = useRef(null);
 
   useEffect(() => {
@@ -370,6 +369,27 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
     link.href = dataURL;
     link.download = `banner-${template.width}x${template.height}-${Date.now()}.png`;
     link.click();
+  };
+
+  // Open Outlook Draft
+  const handleOutlookDraft = () => {
+    if (!canvas) return;
+
+    const dataURL = canvas.toDataURL({
+      format: 'png',
+      quality: 1
+    });
+
+    const blob = generateOutlookEML(dataURL);
+    const objectUrl = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `OutlookDraft-${template.width}x${template.height}-${Date.now()}.eml`;
+    link.click();
+    
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
   };
 
   return (
@@ -930,10 +950,16 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
         {/* Action Buttons */}
         <div className="p-6 mt-auto space-y-3">
           <button
-            onClick={() => setShowEmailModal(true)}
+            onClick={() => onClearCanvas && onClearCanvas()}
+            className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
+          >
+            Clear Canvas
+          </button>
+          <button
+            onClick={handleOutlookDraft}
             className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
           >
-            📧 Send via Email
+            Open Outlook Draft
           </button>
           <button
             onClick={handleDownload}
@@ -941,22 +967,8 @@ export default function Sidebar({ canvas, selectedObject, template, onClearCanva
           >
             Download PNG
           </button>
-          <button
-            onClick={() => onClearCanvas && onClearCanvas()}
-            className="w-full bg-red-500 hover:bg-red-600 text-white py-3 px-4 rounded-lg font-semibold transition-colors shadow-md"
-          >
-            Clear Canvas
-          </button>
         </div>
       </div>
-
-      {/* Email Compose Modal */}
-      <EmailComposeModal
-        isOpen={showEmailModal}
-        onClose={() => setShowEmailModal(false)}
-        canvas={canvas}
-        template={template}
-      />
     </>
   );
 }
