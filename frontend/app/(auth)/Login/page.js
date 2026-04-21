@@ -58,10 +58,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4 sm:px-6 lg:px-8 relative">
-      <div className="absolute top-8 left-8">
+      <div className="absolute top-4 left-4 sm:top-8 sm:left-8 hidden sm:block">
         <img 
           src="/BauerImages/Logo/Logo_black.png" 
-          alt="Logo" 
+          alt="Bauer Logo" 
           className="h-20 w-auto"
         />
       </div>

@@ -13,6 +13,9 @@ import { MdFlip } from 'react-icons/md';
 import AudioLogoMenu from './AudioLogoMenu';
 import ContentMenu from './ContentMenu';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const IMAGE_MAX_SIZE = 20 * 1024 * 1024; // 20MB limit for web images
+
 export default function EditorPage() {
   const searchParams = useSearchParams();
   const templateId = searchParams.get('templateId') || 'custom';
@@ -72,7 +75,7 @@ export default function EditorPage() {
   useEffect(() => {
     const loadLogoLibrary = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/logos', {
+        const response = await fetch(`${API_BASE_URL}/api/logos`, {
           credentials: 'include',
         });
         const data = await response.json();
@@ -93,7 +96,7 @@ export default function EditorPage() {
 
   const fetchSavedTemplates = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/templates', {
+      const response = await fetch(`${API_BASE_URL}/api/templates`, {
         credentials: 'include',
       });
       const data = await response.json();
@@ -251,6 +254,15 @@ export default function EditorPage() {
     setRecordedKeys({});
   };
 
+  const handlePlaceholderClick = useCallback((placeholder) => {
+    if (canvas) {
+      canvas.discardActiveObject();
+      canvas.renderAll();
+    }
+    pendingPlaceholderRef.current = placeholder;
+    setShowImageModal(true);
+  }, [canvas]);
+
   const handleCanvasReady = useCallback((canvasInstance, actions) => {
     setCanvas(canvasInstance);
     setCanvasActions(actions);
@@ -269,7 +281,7 @@ export default function EditorPage() {
         handlePlaceholderClick(options.target);
       }
     });
-  }, [templateId, template]);
+  }, [templateId, template, handlePlaceholderClick]);
 
   const handleSelectionChange = useCallback((obj) => {
     setSelectedObject(obj);
@@ -284,12 +296,12 @@ export default function EditorPage() {
     }
   };
 
-  const handleMirrorImage = () => {
+  const handleMirrorImage = useCallback(() => {
     if (selectedObject && selectedObject.type === 'image') {
       selectedObject.set('flipX', !selectedObject.flipX);
       canvas.renderAll();
     }
-  };
+  }, [selectedObject, canvas]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -341,7 +353,7 @@ export default function EditorPage() {
     try {
       const canvasData = canvas.toJSON();
 
-      const response = await fetch('http://localhost:3001/api/templates', {
+      const response = await fetch(`${API_BASE_URL}/api/templates`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -375,7 +387,7 @@ export default function EditorPage() {
     }
   };
 
-  const handleLoadTemplate = () => {
+  const handleLoadTemplate = async () => {
     if (!selectedLoadTemplate || !canvas) {
       alert('Please select a template to load');
       return;
@@ -390,26 +402,25 @@ export default function EditorPage() {
       canvas.clear();
       canvas.backgroundColor = '#ffffff';
       
-      canvas.loadFromJSON(selectedLoadTemplate.canvasData, () => {
-        canvas.forEachObject((obj) => {
-          obj.visible = true;
+      await canvas.loadFromJSON(selectedLoadTemplate.canvasData);
+      canvas.forEachObject((obj) => {
+        obj.visible = true;
 
-          if (obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') {
-            obj.set({
-              originX: 'left',
-              originY: 'top',
-            });
-          }
-        });
-
-        canvas.calcOffset();
-        canvas.renderAll();
-        setSelectedObject(null);
-
-        setTimeout(() => {
-          canvas.renderAll();
-        }, 0);
+        if (obj.type === 'textbox' || obj.type === 'i-text' || obj.type === 'text') {
+          obj.set({
+            originX: 'left',
+            originY: 'top',
+          });
+        }
       });
+
+      canvas.calcOffset();
+      canvas.renderAll();
+      setSelectedObject(null);
+
+      setTimeout(() => {
+        canvas.renderAll();
+      }, 0);
       
       setTimeout(() => {
         alert(`Template "${loadTemplateName}" loaded successfully!`);
@@ -418,15 +429,6 @@ export default function EditorPage() {
       console.error('Error loading template:', error);
       alert('Failed to load template');
     }
-  };
-
-  const handlePlaceholderClick = (placeholder) => {
-    if (canvas) {
-      canvas.discardActiveObject();
-      canvas.renderAll();
-    }
-    pendingPlaceholderRef.current = placeholder;
-    setShowImageModal(true);
   };
 
   const saveRecentImage = (imageSource) => {
@@ -460,9 +462,8 @@ export default function EditorPage() {
     const file = e.target.files[0];
     if (!file) return;
 
-    const maxSize = 200 * 1024 * 1024;
-    if (file.size > maxSize) {
-      alert('File size exceeds 200MB limit');
+    if (file.size > IMAGE_MAX_SIZE) {
+      alert(`File size exceeds ${IMAGE_MAX_SIZE / (1024 * 1024)}MB limit`);
       return;
     }
 
@@ -534,6 +535,9 @@ export default function EditorPage() {
       canvas.add(img);
       canvas.setActiveObject(img);
       canvas.renderAll();
+    }).catch((error) => {
+      console.error('Error loading logo:', error);
+      alert('Failed to load logo. Please try again.');
     });
   };
 
@@ -563,6 +567,9 @@ export default function EditorPage() {
       canvas.add(img);
       canvas.setActiveObject(img);
       canvas.renderAll();
+    }).catch((error) => {
+      console.error('Error loading audio logo:', error);
+      alert('Failed to load audio logo. Please try again.');
     });
   };
 
@@ -818,7 +825,7 @@ export default function EditorPage() {
                 type="text"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSaveTemplate()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveTemplate()}
                 placeholder="Enter template name"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 autoFocus
@@ -899,7 +906,7 @@ export default function EditorPage() {
                 onChange={handleImageFileSelect}
                 className="w-full text-sm text-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               />
-              <p className="text-xs text-gray-500 mt-1">Max 200MB • JPG, PNG, GIF, WebP</p>
+              <p className="text-xs text-gray-500 mt-1">Max 20MB • JPG, PNG, GIF, WebP</p>
             </div>
 
             <div className="mb-6">
@@ -911,7 +918,7 @@ export default function EditorPage() {
                   type="text"
                   value={imageUrlInput}
                   onChange={(e) => setImageUrlInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleImageUrlSubmit()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleImageUrlSubmit()}
                   placeholder="https://example.com/image.jpg"
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
