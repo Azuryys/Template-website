@@ -183,7 +183,7 @@ export default function Header({ isAdmin, handleLogout, userName = "User", userA
                 <FaLayerGroup className="w-4 h-4 text-white" />
               </div>
               <span className="text-lg font-semibold text-gray-900 tracking-tight">
-                Banner Creator
+                Template Creator
               </span>
             </Link>
 

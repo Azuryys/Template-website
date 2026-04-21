@@ -175,6 +175,37 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     }
   }, [saveState]);
 
+  const handleCanvasWheel = useCallback((e) => {
+    const fabricCanvas = canvasRef.current;
+    if (!fabricCanvas) return;
+
+    // Prevent page scroll/zoom
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Get the zoom increment (wheel delta determines direction and speed)
+    const zoomStep = 0.1;
+    const zoomDirection = e.deltaY > 0 ? -1 : 1; // Negative deltaY = scroll up = zoom in
+    const currentZoom = fabricCanvas.getZoom();
+    const newZoom = Math.max(1, Math.min(3, currentZoom + zoomDirection * zoomStep));
+
+    // Get mouse position relative to canvas
+    const canvasElement = fabricCanvas.getElement();
+    const rect = canvasElement.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // If zooming to minimum (1x), center the canvas
+    if (newZoom === 1) {
+      fabricCanvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+    } else {
+      // Zoom to the point where the mouse is
+      fabricCanvas.zoomToPoint({ x, y }, newZoom);
+    }
+
+    fabricCanvas.renderAll();
+  }, []);
+
   useEffect(() => {
     if (!template) return;
 
@@ -269,5 +300,6 @@ export default function useCanvasEditor(canvasId, template, onSelectionChange, h
     delete: performDelete,
     bringForward: performBringForward,
     sendBackward: performSendBackward,
+    handleCanvasWheel,
   };
 }
