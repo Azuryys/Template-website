@@ -754,36 +754,50 @@ app.patch('/api/logo-folders/:id', async (req, res) => {
       await mkdir(newDiskPath, { recursive: true });
     }
 
-    // Atualiza file_path de todos os logos desta pasta na BD
-    await pool.query(
-      `UPDATE app_logos
-       SET file_path = REPLACE(file_path, $1, $2)
-       WHERE folder_id = $3`,
-      [
-        `/BauerImages/Custom/${folder.slug}/`,
-        `/BauerImages/Custom/${newSlug}/`,
-        folderId,
-      ]
-    );
+    // Atualiza file_path de todos os logos desta pasta na BD e a pasta em transação
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Atualiza BD
-    const updated = await pool.query(
-      `UPDATE logo_folders SET name = $1, slug = $2 WHERE id = $3
-       RETURNING id, name, slug, created_by, created_at`,
-      [newName, newSlug, folderId]
-    );
+      // Atualiza file_path de todos os logos desta pasta
+      await client.query(
+        `UPDATE app_logos
+         SET file_path = REPLACE(file_path, $1, $2)
+         WHERE folder_id = $3`,
+        [
+          `/BauerImages/Custom/${folder.slug}/`,
+          `/BauerImages/Custom/${newSlug}/`,
+          folderId,
+        ]
+      );
 
-    const row = updated.rows[0];
-    res.json({
-      folder: {
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        publicPath: `/BauerImages/Custom/${row.slug}`,
-        createdBy: row.created_by,
-        createdAt: row.created_at,
-      },
-    });
+      // Atualiza BD da pasta
+      const updated = await client.query(
+        `UPDATE logo_folders SET name = $1, slug = $2 WHERE id = $3
+         RETURNING id, name, slug, created_by, created_at`,
+        [newName, newSlug, folderId]
+      );
+
+      await client.query('COMMIT');
+
+      const row = updated.rows[0];
+      res.json({
+        folder: {
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          publicPath: `/BauerImages/Custom/${row.slug}`,
+          createdBy: row.created_by,
+          createdAt: row.created_at,
+        },
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error('Erro ao renomear pasta:', error);
+      res.status(500).json({ error: 'Erro interno do servidor' });
+    } finally {
+      client.release();
+    }
   } catch (error) {
     console.error('Erro ao renomear pasta:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
@@ -811,11 +825,24 @@ app.delete('/api/logo-folders/:id', async (req, res) => {
 
     const folder = folderResult.rows[0];
 
-    // Remove todos os logos associados na BD
-    await pool.query(`DELETE FROM app_logos WHERE folder_id = $1`, [folderId]);
+    // Remove logos e pasta em transação para garantir atomicidade
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Remove a pasta da BD
-    await pool.query(`DELETE FROM logo_folders WHERE id = $1`, [folderId]);
+      // Remove todos os logos associados na BD
+      await client.query(`DELETE FROM app_logos WHERE folder_id = $1`, [folderId]);
+
+      // Remove a pasta da BD
+      await client.query(`DELETE FROM logo_folders WHERE id = $1`, [folderId]);
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
     // Remove a pasta física (e todo o seu conteúdo) do disco
     const diskPath = customFolderPath(folder.slug);

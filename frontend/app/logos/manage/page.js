@@ -17,8 +17,7 @@ import {
 } from "react-icons/fa";
 import Header from "@/components/Header";
 import { authClient } from "@/lib/auth-client";
-
-const API = "http://localhost:3001";
+import API from "@/lib/apiConfig";
 
 // ---------- helpers ----------
 

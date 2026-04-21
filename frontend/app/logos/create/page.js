@@ -6,8 +6,7 @@ import Link from "next/link";
 import { FaArrowLeft, FaCheckCircle, FaFolder, FaCog } from "react-icons/fa";
 import Header from "@/components/Header";
 import { authClient } from "@/lib/auth-client";
-
-const API = "http://localhost:3001";
+import API from "@/lib/apiConfig";
 
 // Pastas fixas do sistema (legacy). Sempre presentes.
 const FIXED_CATEGORIES = [
