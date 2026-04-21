@@ -14,7 +14,7 @@ import { sendRecoveryCodeEmail, sendTestEmail } from '../lib/sendgrid.js';
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
 import { hashPassword } from 'better-auth/crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { writeFile, mkdir, readdir, unlink } from 'fs/promises';
+import { writeFile, mkdir, readdir, unlink, rm, rename } from 'fs/promises';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -66,6 +66,28 @@ function normalizeImageExtension(file) {
   }
 
   return null;
+}
+
+/** Converte um nome livre num slug seguro para o sistema de ficheiros */
+function toFolderSlug(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+    .trim()
+    .replace(/\s+/g, '_')
+    .toLowerCase()
+    || `folder_${Date.now()}`;
+}
+
+/** Caminho físico no disco para uma pasta dinâmica */
+function customFolderPath(slug) {
+  return join(BAUER_IMAGES_ROOT, 'Custom', slug);
+}
+
+/** URL pública para um logo numa pasta dinâmica */
+function customLogoPublicPath(slug, fileName) {
+  return `/BauerImages/Custom/${slug}/${fileName}`;
 }
 
 // Le os ficheiros das pastas de logos do frontend para montar a biblioteca.
@@ -202,6 +224,18 @@ async function ensureAuthSchema() {
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS logo_folders (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    ALTER TABLE app_logos ADD COLUMN IF NOT EXISTS folder_id TEXT REFERENCES logo_folders(id) ON DELETE SET NULL
   `);
 }
 
@@ -388,21 +422,52 @@ app.post('/api/logos/upload', (req, res) => {
 
       const safeBase = toSafeFileBaseName(normalizedName);
       const fileName = `${safeBase}_${Date.now()}.${extension}`;
-      const folderPath = join(BAUER_IMAGES_ROOT, targetFolder);
-      const filePathOnDisk = join(folderPath, fileName);
+      const folderId = req.body?.folderId || null;
+      let publicPath = `/BauerImages/${targetFolder}/${fileName}`;
+      let diskPathForSave = join(BAUER_IMAGES_ROOT, targetFolder, fileName);
 
-      await mkdir(folderPath, { recursive: true });
-      await writeFile(filePathOnDisk, req.file.buffer);
+      // Se foi especificado folderId, salva em pasta dinâmica
+      if (folderId) {
+        const folderResult = await pool.query(
+          `SELECT id, slug FROM logo_folders WHERE id = $1`, [folderId]
+        );
+        if (folderResult.rowCount > 0) {
+          const dynFolder = folderResult.rows[0];
+          const dynDiskPath = customFolderPath(dynFolder.slug);
+          diskPathForSave = join(dynDiskPath, fileName);
+          await mkdir(dynDiskPath, { recursive: true });
+          publicPath = customLogoPublicPath(dynFolder.slug, fileName);
+        }
+      } else {
+        // Caso contrário, usa pasta fixa
+        const folderPath = join(BAUER_IMAGES_ROOT, targetFolder);
+        await mkdir(folderPath, { recursive: true });
+      }
 
-      const publicPath = `/BauerImages/${targetFolder}/${fileName}`;
+      await writeFile(diskPathForSave, req.file.buffer);
+
+      // Guarda na BD
+      const result = await pool.query(
+        `INSERT INTO app_logos (name, category, file_path, folder_id, created_by)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (category, file_path)
+         DO UPDATE SET name = EXCLUDED.name
+         RETURNING id, name, category, file_path, folder_id, created_by, created_at`,
+        [normalizedName, normalizedCategory, publicPath, folderId, session.user.id]
+      );
+
+      const row = result.rows[0];
       res.status(201).json({
         message: 'Upload concluído',
         logo: {
-          id: `${normalizedCategory}-${fileName}`,
-          name: normalizedName,
+          id: row.id,
+          name: row.name,
+          category: row.category,
           fileName,
-          filePath: publicPath,
-          category: normalizedCategory,
+          filePath: row.file_path,
+          folderId: row.folder_id,
+          createdBy: row.created_by,
+          createdAt: row.created_at,
         },
       });
     } catch (error) {
@@ -419,7 +484,7 @@ app.get('/api/logos', async (req, res) => {
     if (!session) return;
 
     const result = await pool.query(
-      `SELECT id, name, category, file_path, created_by, created_at
+      `SELECT id, name, category, file_path, folder_id, created_by, created_at
        FROM app_logos
        ORDER BY created_at DESC`
     );
@@ -429,6 +494,7 @@ app.get('/api/logos', async (req, res) => {
       name: row.name,
       category: row.category,
       filePath: row.file_path,
+      folderId: row.folder_id,
       createdBy: row.created_by,
       createdAt: row.created_at,
     }));
@@ -477,7 +543,7 @@ app.post('/api/logos', async (req, res) => {
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (category, file_path)
        DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, name, category, file_path, created_by, created_at`,
+       RETURNING id, name, category, file_path, folder_id, created_by, created_at`,
       [normalizedName, normalizedCategory, normalizedPath, session.user.id]
     );
 
@@ -488,6 +554,7 @@ app.post('/api/logos', async (req, res) => {
         name: row.name,
         category: row.category,
         filePath: row.file_path,
+        folderId: row.folder_id,
         createdBy: row.created_by,
         createdAt: row.created_at,
       },
@@ -523,6 +590,347 @@ app.delete('/api/logos/:id', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Erro ao apagar logo:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// ============================================
+// LOGO FOLDERS - PASTAS DINÂMICAS
+// ============================================
+
+/**
+ * GET /api/logo-folders
+ * Lista todas as pastas dinâmicas criadas pelos admins.
+ */
+app.get('/api/logo-folders', async (req, res) => {
+  try {
+    const session = await requireAuthenticatedSession(req, res);
+    if (!session) return;
+
+    const result = await pool.query(
+      `SELECT id, name, slug, created_by, created_at
+       FROM logo_folders
+       ORDER BY created_at ASC`
+    );
+
+    // Para cada pasta, conta quantos logos tem associados
+    const foldersWithCount = await Promise.all(
+      result.rows.map(async (row) => {
+        const countResult = await pool.query(
+          `SELECT COUNT(*) AS total FROM app_logos WHERE folder_id = $1`,
+          [row.id]
+        );
+        return {
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          logoCount: parseInt(countResult.rows[0]?.total ?? 0, 10),
+          publicPath: `/BauerImages/Custom/${row.slug}`,
+          createdBy: row.created_by,
+          createdAt: row.created_at,
+        };
+      })
+    );
+
+    res.json({ folders: foldersWithCount });
+  } catch (error) {
+    console.error('Erro ao listar pastas:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * POST /api/logo-folders
+ * Cria uma nova pasta dinâmica (BD + disco).
+ * Body: { name: string }
+ */
+app.post('/api/logo-folders', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const normalizedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    if (!normalizedName) {
+      return res.status(400).json({ error: 'Nome da pasta é obrigatório' });
+    }
+
+    const slug = toFolderSlug(normalizedName);
+
+    // Verifica se já existe uma pasta com este slug
+    const existing = await pool.query(
+      `SELECT id FROM logo_folders WHERE slug = $1`,
+      [slug]
+    );
+    if (existing.rowCount > 0) {
+      return res.status(400).json({ error: 'Já existe uma pasta com este nome' });
+    }
+
+    // Cria a pasta física no disco
+    const diskPath = customFolderPath(slug);
+    await mkdir(diskPath, { recursive: true });
+
+    // Regista na BD
+    const result = await pool.query(
+      `INSERT INTO logo_folders (name, slug, created_by)
+       VALUES ($1, $2, $3)
+       RETURNING id, name, slug, created_by, created_at`,
+      [normalizedName, slug, session.user.id]
+    );
+
+    const row = result.rows[0];
+    res.status(201).json({
+      folder: {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        logoCount: 0,
+        publicPath: `/BauerImages/Custom/${row.slug}`,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao criar pasta:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * PATCH /api/logo-folders/:id
+ * Renomeia uma pasta (BD + disco).
+ * Body: { name: string }
+ */
+app.patch('/api/logo-folders/:id', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const folderId = req.params.id;
+    const newName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+
+    if (!newName) {
+      return res.status(400).json({ error: 'Novo nome é obrigatório' });
+    }
+
+    // Busca pasta atual
+    const folderResult = await pool.query(
+      `SELECT id, name, slug FROM logo_folders WHERE id = $1`,
+      [folderId]
+    );
+    if (folderResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Pasta não encontrada' });
+    }
+
+    const folder = folderResult.rows[0];
+    const newSlug = toFolderSlug(newName);
+
+    if (newSlug === folder.slug) {
+      // Só atualiza o nome de exibição, sem mexer no disco
+      const updated = await pool.query(
+        `UPDATE logo_folders SET name = $1 WHERE id = $2
+         RETURNING id, name, slug, created_by, created_at`,
+        [newName, folderId]
+      );
+      return res.json({ folder: { ...updated.rows[0], logoCount: undefined } });
+    }
+
+    // Verifica conflito de slug
+    const conflict = await pool.query(
+      `SELECT id FROM logo_folders WHERE slug = $1 AND id != $2`,
+      [newSlug, folderId]
+    );
+    if (conflict.rowCount > 0) {
+      return res.status(400).json({ error: 'Já existe uma pasta com este nome' });
+    }
+
+    // Renomeia a pasta física no disco
+    const oldDiskPath = customFolderPath(folder.slug);
+    const newDiskPath = customFolderPath(newSlug);
+    try {
+      await rename(oldDiskPath, newDiskPath);
+    } catch (fsError) {
+      if (fsError?.code !== 'ENOENT') throw fsError;
+      // A pasta física não existia, criamos a nova sem problema
+      await mkdir(newDiskPath, { recursive: true });
+    }
+
+    // Atualiza file_path de todos os logos desta pasta na BD
+    await pool.query(
+      `UPDATE app_logos
+       SET file_path = REPLACE(file_path, $1, $2)
+       WHERE folder_id = $3`,
+      [
+        `/BauerImages/Custom/${folder.slug}/`,
+        `/BauerImages/Custom/${newSlug}/`,
+        folderId,
+      ]
+    );
+
+    // Atualiza BD
+    const updated = await pool.query(
+      `UPDATE logo_folders SET name = $1, slug = $2 WHERE id = $3
+       RETURNING id, name, slug, created_by, created_at`,
+      [newName, newSlug, folderId]
+    );
+
+    const row = updated.rows[0];
+    res.json({
+      folder: {
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        publicPath: `/BauerImages/Custom/${row.slug}`,
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao renomear pasta:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * DELETE /api/logo-folders/:id
+ * Apaga pasta e todos os logos dentro (BD + disco).
+ */
+app.delete('/api/logo-folders/:id', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const folderId = req.params.id;
+
+    const folderResult = await pool.query(
+      `SELECT id, slug FROM logo_folders WHERE id = $1`,
+      [folderId]
+    );
+    if (folderResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Pasta não encontrada' });
+    }
+
+    const folder = folderResult.rows[0];
+
+    // Remove todos os logos associados na BD
+    await pool.query(`DELETE FROM app_logos WHERE folder_id = $1`, [folderId]);
+
+    // Remove a pasta da BD
+    await pool.query(`DELETE FROM logo_folders WHERE id = $1`, [folderId]);
+
+    // Remove a pasta física (e todo o seu conteúdo) do disco
+    const diskPath = customFolderPath(folder.slug);
+    try {
+      await rm(diskPath, { recursive: true, force: true });
+    } catch (fsError) {
+      // Ignora se já não existia
+      if (fsError?.code !== 'ENOENT') {
+        console.error('Erro ao remover pasta do disco:', fsError);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao apagar pasta:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+/**
+ * PATCH /api/logos/:id/move
+ * Move um logo de uma pasta para outra (ou para pasta fixa legacy).
+ * Body: { targetFolderId: string | null }
+ *   targetFolderId = null → volta a ser logo "solto" (sem pasta dinâmica)
+ */
+app.patch('/api/logos/:id/move', async (req, res) => {
+  try {
+    const session = await requireAdminSession(req, res);
+    if (!session) return;
+
+    const logoId = req.params.id;
+    const { targetFolderId } = req.body;
+
+    // Busca logo atual
+    const logoResult = await pool.query(
+      `SELECT id, name, category, file_path, folder_id FROM app_logos WHERE id = $1`,
+      [logoId]
+    );
+    if (logoResult.rowCount === 0) {
+      return res.status(404).json({ error: 'Logo não encontrado' });
+    }
+
+    const logo = logoResult.rows[0];
+
+    // --- Destino: pasta dinâmica ---
+    if (targetFolderId) {
+      const targetFolderResult = await pool.query(
+        `SELECT id, slug FROM logo_folders WHERE id = $1`,
+        [targetFolderId]
+      );
+      if (targetFolderResult.rowCount === 0) {
+        return res.status(404).json({ error: 'Pasta de destino não encontrada' });
+      }
+
+      const targetFolder = targetFolderResult.rows[0];
+      const fileName = basename(logo.file_path);
+
+      // Move o ficheiro físico se ainda estiver numa pasta dinâmica
+      if (logo.file_path.startsWith('/BauerImages/Custom/')) {
+        const oldDiskPath = join(BAUER_IMAGES_ROOT, logo.file_path.replace('/BauerImages/', ''));
+        const newDiskPath = join(customFolderPath(targetFolder.slug), fileName);
+
+        try {
+          await mkdir(customFolderPath(targetFolder.slug), { recursive: true });
+          await rename(oldDiskPath, newDiskPath);
+        } catch (fsError) {
+          if (fsError?.code !== 'ENOENT') throw fsError;
+        }
+      }
+      // Se o logo vem de uma pasta fixa (Logo, Logo_Audio), não mexemos no ficheiro físico;
+      // apenas atualizamos o registo na BD (o ficheiro permanece onde está).
+
+      const newPath = logo.file_path.startsWith('/BauerImages/Custom/')
+        ? customLogoPublicPath(targetFolder.slug, fileName)
+        : logo.file_path; // mantém o caminho original para logos de pastas fixas
+
+      const updated = await pool.query(
+        `UPDATE app_logos SET folder_id = $1, file_path = $2 WHERE id = $3
+         RETURNING id, name, category, file_path, folder_id, created_by, created_at`,
+        [targetFolderId, newPath, logoId]
+      );
+
+      return res.json({
+        logo: {
+          id: updated.rows[0].id,
+          name: updated.rows[0].name,
+          category: updated.rows[0].category,
+          filePath: updated.rows[0].file_path,
+          folderId: updated.rows[0].folder_id,
+          createdBy: updated.rows[0].created_by,
+          createdAt: updated.rows[0].created_at,
+        },
+      });
+    }
+
+    // --- Destino: sem pasta dinâmica (desassociar) ---
+    const updated = await pool.query(
+      `UPDATE app_logos SET folder_id = NULL WHERE id = $1
+       RETURNING id, name, category, file_path, folder_id, created_by, created_at`,
+      [logoId]
+    );
+
+    res.json({
+      logo: {
+        id: updated.rows[0].id,
+        name: updated.rows[0].name,
+        category: updated.rows[0].category,
+        filePath: updated.rows[0].file_path,
+        folderId: updated.rows[0].folder_id,
+        createdBy: updated.rows[0].created_by,
+        createdAt: updated.rows[0].created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Erro ao mover logo:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
