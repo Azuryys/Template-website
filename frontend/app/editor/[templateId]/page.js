@@ -42,6 +42,7 @@ export default function EditorPage({ params }) {
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [canvasActions, setCanvasActions] = useState(null);
+  const [cardSide, setCardSide] = useState('front');
   const pendingPlaceholderRef = useRef(null);
 
   const { logoImages, audioLogoImages } = useLogos();
@@ -96,11 +97,16 @@ export default function EditorPage({ params }) {
     
     const initializer = getTemplateInitializer(templateId);
     if (initializer) {
-      const elements = initializer(template);
-      elements.forEach((element) => {
-        canvasInstance.add(element);
+      // Handle both sync and async initializers
+      Promise.resolve(initializer(template)).then((elements) => {
+        const initializedElements = Array.isArray(elements) ? elements : [];
+        initializedElements.forEach((element) => {
+          canvasInstance.add(element);
+        });
+        canvasInstance.renderAll();
+      }).catch((error) => {
+        console.error('Error initializing template:', error);
       });
-      canvasInstance.renderAll();
     }
 
     canvasInstance.on('mouse:dblclick', (options) => {
@@ -425,6 +431,95 @@ export default function EditorPage({ params }) {
     });
   };
 
+  // Toggle between front and back of card
+  const handleToggleCardSide = () => {
+    if (!canvas) return;
+    const newSide = cardSide === 'front' ? 'back' : 'front';
+    
+    canvas.forEachObject((obj) => {
+      if (obj.cardSide) {
+        obj.visible = obj.cardSide === newSide;
+      }
+    });
+    
+    canvas.renderAll();
+    setCardSide(newSide);
+  };
+
+  // Download card as PDF (both front and back)
+  const handleDownloadPDF = async () => {
+    if (!canvas) {
+      alert('Canvas not ready');
+      return;
+    }
+
+    try {
+      // Dynamically import jsPDF
+      const { jsPDF } = await import('jspdf');
+      
+      // Canvas dimensions
+      const canvasWidth = template.width;
+      const canvasHeight = template.height;
+      
+      // Create PDF with dimensions matching the card (609x853 in pixels = ~215x300mm in mm)
+      const widthMm = (canvasWidth / 72) * 25.4; // Convert pixels to mm (assuming 72 DPI)
+      const heightMm = (canvasHeight / 72) * 25.4;
+      
+      const pdf = new jsPDF({
+        orientation: canvasWidth > canvasHeight ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [widthMm, heightMm],
+        compress: true
+      });
+
+      // Function to render a side and add to PDF
+      const renderSideToPDF = (side) => {
+        // Toggle visibility
+        canvas.forEachObject((obj) => {
+          if (obj.cardSide) {
+            obj.visible = obj.cardSide === side;
+          }
+        });
+        
+        canvas.renderAll();
+        
+        // Get canvas data as image
+        const dataUrl = canvas.toDataURL({
+          format: 'png',
+          quality: 0.95,
+          multiplier: 2 // Higher quality
+        });
+
+        // Add image to PDF
+        pdf.addImage(dataUrl, 'PNG', 0, 0, widthMm, heightMm);
+      };
+
+      // Render and add front side
+      renderSideToPDF('front');
+      
+      // Add new page for back side
+      pdf.addPage([widthMm, heightMm]);
+      renderSideToPDF('back');
+
+      // Restore to front view for user
+      canvas.forEachObject((obj) => {
+        if (obj.cardSide) {
+          obj.visible = obj.cardSide === cardSide;
+        }
+      });
+      canvas.renderAll();
+
+      // Download PDF
+      const fileName = `card-${template.cardType ?? 'default'}-${new Date().getTime()}.pdf`;
+      pdf.save(fileName);
+      
+      alert(`Card PDF downloaded as ${fileName}`);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       {/* Top Bar */}
@@ -602,13 +697,37 @@ export default function EditorPage({ params }) {
               </div>
             )}
           </div>
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            title="Settings"
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-          >
-            <FaCog className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Card Side Toggle (only for card templates) */}
+            {template.isCardTemplate && (
+              <button
+                onClick={handleToggleCardSide}
+                className="px-4 py-2 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-black font-medium rounded transition-colors"
+                title={`View ${cardSide === 'front' ? 'back' : 'front'} side`}
+              >
+                {cardSide === 'front' ? '📄 Front' : '📄 Back'}
+              </button>
+            )}
+
+            {/* PDF Download (only for card templates) */}
+            {template.isCardTemplate && (
+              <button
+                onClick={handleDownloadPDF}
+                className="px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-black font-medium rounded transition-colors"
+                title="Download as PDF"
+              >
+                📥 PDF
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              title="Settings"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+            >
+              <FaCog className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 

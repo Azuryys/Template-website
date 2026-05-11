@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customWidth, setCustomWidth] = useState('');
   const [customHeight, setCustomHeight] = useState('');
+  const [showCardModal, setShowCardModal] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -64,6 +65,15 @@ export default function Dashboard() {
     router.push(`/editor/custom?width=${w}&height=${h}`);
   };
 
+  const cardTemplates = templates.filter((template) => template.isCardTemplate);
+  const nonCardTemplates = templates.filter((template) => !template.isCardTemplate);
+
+  // Handle card template selection
+  const handleCardTypeSelect = (templateId) => {
+    setShowCardModal(false);
+    router.push(`/editor/${templateId}`);
+  };
+
   if (loadingSession || !user) {
     return null;
   }
@@ -85,7 +95,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {templates.map((template) => (
+          {nonCardTemplates.map((template) => (
             <Link
               key={template.id}
               href={`/editor/${template.id}`}
@@ -125,6 +135,47 @@ export default function Dashboard() {
             </Link>
           ))}
 
+          {cardTemplates.length > 0 && (
+            <button
+              key="business-card"
+              onClick={() => setShowCardModal(true)}
+              className="group text-left"
+            >
+              <div className="bg-white rounded-lg shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border border-gray-200 hover:border-blue-500">
+                <div className="mb-4">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                    Business Card
+                  </h2>
+                  <p className="text-gray-600 text-sm mb-4">
+                    Escolha um tipo de cartão de visita para começar
+                  </p>
+                </div>
+
+                {/* Preview box showing aspect ratio */}
+                <div className="bg-gray-100 rounded-lg p-4 mb-4 flex items-center justify-center min-h-32">
+                  <div
+                    className="bg-gradient-to-br rounded shadow-md"
+                    style={{
+                      width: `${Math.min(200, cardTemplates[0].width / 10)}px`,
+                      height: `${Math.min(120, cardTemplates[0].height / 10)}px`,
+                      maxWidth: '100%',
+                      backgroundColor: cardTemplates[0].frontBackgroundColor
+                    }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-mono text-gray-700">
+                    {cardTemplates[0].width} × {cardTemplates[0].height}
+                  </span>
+                  <span className="text-blue-600 font-semibold group-hover:translate-x-2 transition-transform">
+                    Criar →
+                  </span>
+                </div>
+              </div>
+            </button>
+          )}
+
           {/* Custom resolution card */}
           <button
             onClick={() => setShowCustomModal(true)}
@@ -156,6 +207,48 @@ export default function Dashboard() {
             </div>
           </button>
         </div>
+
+        {/* Card Type Selection Modal */}
+        {showCardModal && (
+          <div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowCardModal(false); }}
+          >
+            <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-2xl mx-4">
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Selecione o Tipo de Cartão</h3>
+              <p className="text-gray-600 mb-8">Escolha o tipo de cartão de visita que deseja criar:</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {cardTemplates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => handleCardTypeSelect(template.id)}
+                    className="group text-left p-6 border-2 rounded-lg transition-all hover:bg-gray-50"
+                    style={{ borderColor: template.frontBackgroundColor }}
+                  >
+                    <div
+                      className="w-full h-40 rounded-lg mb-4 flex items-center justify-center text-white font-bold text-center px-2"
+                      style={{ backgroundColor: template.frontBackgroundColor }}
+                    >
+                      <p className="text-sm">{template.name}</p>
+                    </div>
+                    <h4 className="font-semibold text-gray-900">{template.name}</h4>
+                    <p className="text-sm text-gray-600">{template.description}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-3 mt-8">
+                <button
+                  onClick={() => setShowCardModal(false)}
+                  className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Custom resolution modal */}
         {showCustomModal && (
